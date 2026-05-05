@@ -1,0 +1,33 @@
+# Dependencies
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+*.env.local
+
+# Database
+*.db
+*.db-*
+*.sqlite3
+
+# Logs
+*.log
+/tmp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Relay data
+blobs/*.blob

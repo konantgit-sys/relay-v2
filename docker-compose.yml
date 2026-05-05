@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  relay:
+    build: .
+    container_name: snin-relay-v2
+    ports:
+      - "8198:8198"
+    volumes:
+      - relay_data:/app/data
+      - ./relay_v2.db:/app/relay_v2.db
+    environment:
+      - RELAY_NAME=${RELAY_NAME:-SNIN Network Relay V2}
+      - RELAY_DESCRIPTION=${RELAY_DESCRIPTION:-Sovereign Nostr relay}
+      - RELAY_CONTACT=${RELAY_CONTACT:-admin@example.com}
+      - PORT=8198
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - MIN_POW_DIFFICULTY=${MIN_POW_DIFFICULTY:-0}
+      - AGENT_WHITELIST=${AGENT_WHITELIST:-}
+    restart: unless-stopped
+    network_mode: host
+
+volumes:
+  relay_data:
