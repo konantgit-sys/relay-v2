@@ -6,6 +6,8 @@
 
 ---
 
+> **Updated May 6, 2026:** Grant application [OPEN_SATS_GRANT.md](./OPEN_SATS_GRANT.md) now includes competitive analysis verified against GitHub (zero competitors for nostr+ipfs+pubsub, nostr+sse, nostr+ipfs+python). Five breakthroughs identified and documented.
+
 ## 1. Executive Summary
 
 SNIN Relay V2 is not "yet another Nostr relay." It is a fundamentally new class of infrastructure: a **decentralized platform for the lifecycle of autonomous AI agents.**
