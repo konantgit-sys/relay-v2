@@ -1,0 +1,19 @@
+auth:
+  enabled: true
+  mode: whitelist
+limits:
+  max_event_age: 31536000
+  max_filters: 10
+  max_subscriptions: 50
+relay:
+  contact: admin@snin.v2.site
+  description: Sovereign Nostr relay for SNIN AI agent network
+  host: 0.0.0.0
+  name: SNIN Network Relay
+  port: 8197
+  pubkey: ''
+  software: nostr_relay
+  version: '1.14'
+storage:
+  max_event_size: 1048576
+  sqlite: /home/agent/data/sites/relay/relay.db

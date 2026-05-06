@@ -1,6 +1,9 @@
 # SNIN Relay V2 — Python dependencies
+PyYAML>=6.0
 aiohttp>=3.9
 aiosqlite>=0.20
-websockets>=12.0
+bech32>=1.2
+coincurve>=18.0
 nostr-sdk>=0.40
-PyYAML>=6.0
+nostr_protocol>=0.1.0
+websockets>=12.0

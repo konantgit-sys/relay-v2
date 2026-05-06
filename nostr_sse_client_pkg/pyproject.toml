@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "nostr-sse-client"
+version = "1.0.0"
+description = "Nostr client over SSE (Server-Sent Events) — no WebSocket required"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "SNIN Network"}]
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.28",
+    "coincurve>=18.0",
+    "nostr_protocol>=0.1.0",
+    "bech32>=1.2",
+]
+
+[project.urls]
+Homepage = "https://github.com/snin/nostr-sse-client"
+Repository = "https://github.com/snin/nostr-sse-client"
+
+[project.scripts]
+nostr-sse = "nostr_sse_client.cli:main"

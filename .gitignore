@@ -31,3 +31,9 @@ Thumbs.db
 
 # Relay data
 blobs/*.blob
+__pycache__/
+*.log
+*.db
+*.db-shm
+*.db-wal
+relay/blobs/
