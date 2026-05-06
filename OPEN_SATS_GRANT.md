@@ -177,17 +177,36 @@ This is the first time a Nostr relay has been used as a **governance platform** 
 3. **IPFS kubo 0.32 is production-ready** — pubsub via CLI works reliably. The IPFS ecosystem is mature enough for relay integration.
 4. **Nostr needs infrastructure, not apps** — There are enough Nostr clients. What's missing is relay diversity and accessibility. SSE + IPFS creates a new category of relay.
 
+## Developer Context
+
+**This project is developed entirely from a smartphone (iPhone 11 Pro Max).** No laptop, no desktop computer, no workstation.
+
+This is a practical reality for many independent developers in sanctioned regions. The entire codebase — 17 Python modules, 50+ files, relay infrastructure, SSE library, DAO governance — was written, debugged, and deployed using a phone with a terminal emulator and remote server access.
+
+**This has direct impact on development velocity.** What takes 1 hour on a workstation takes 4-6 hours on a phone: switching between terminal sessions, limited screen real estate, no local IDE/compiler, no ability to run multiple test instances simultaneously. The developer is based in Russia, where sanctions have tripled the cost of imported hardware.
+
 ## Grant Request: $10,000
 
-**Why $10k instead of $5k:** The scope is larger than initially estimated. Five breakthrough technologies require dedicated engineering and outreach.
+**Why $10k:** Developer works from a phone with no local machine. A proper development workstation is the single highest-impact investment for this project.
 
-| Item | Amount | Details |
-|------|--------|---------|
-| **Direct WSS port** | $2,000 | Public IP with TCP WSS (bypass Ingress), monthly server cost, DNS |
-| **nostr-sse-client → PyPI** | $2,000 | Package cleanup, CI/CD, documentation, examples |
-| **NIP expansion** | $2,500 | NIP-29 groups, NIP-51 lists, NIP-44 encryption |
-| **SSE integration guide** | $1,500 | Documentation for other relay operators to add SSE support |
-| **Community + adoption** | $2,000 | Developer outreach, Nostr community engagement, grant report |
+| Item | Amount (USD) | Details |
+|------|-------------|---------|
+| **Development workstation** | $4,000 | Mid-range Linux workstation (Ryzen 9 / 64GB RAM / 1TB NVMe). Price inflated by sanctions + import duties in Russia (~3x retail) |
+| **nostr-sse-client → PyPI** | $2,000 | Package cleanup, CI/CD (GitHub Actions), documentation, integration tests, PyPI release |
+| **NIP expansion** | $2,000 | Add NIP-44 (encrypted payloads), NIP-51 (lists), NIP-32 (labeling), full NIP-29 group chat support |
+| **Community + outreach** | $1,000 | Developer documentation, Nostr community engagement, SSE integration guide for other relay operators |
+| **Bounty for NIP reviewers** | $1,000 | Bug bounties for security audit + NIP compliance review |
+
+**Price justification:** Hardware costs in Russia are 2.5-3x MSRP due to sanctions + parallel import markup. A workstation that costs $1,500 in the US costs $4,000 in Russia. This is not markup — it's the current market reality.
+
+## Budget Impact on Development
+
+| Before (phone only) | After (with workstation) | Speedup |
+|---------------------|------------------------|---------|
+| 4-6 hours for a debug cycle | 30 minutes | **8-12x faster** |
+| No local testing (remote only) | Local test instances | **Parallel development** |
+| Single terminal at a time | Full IDE + terminals | **context switching free** |
+| Can't run WSS locally | Full local Nostr network | **faster iteration** |
 
 ## Future Vision
 
@@ -199,10 +218,11 @@ SNIN Relay V2 as the **default infrastructure layer** for:
 
 ## Team
 
-**SNIN Network** — decentralized AI infrastructure developers.
+**SNIN Network** — decentralized AI infrastructure developer. Single developer, Russia-based, working exclusively from a smartphone.
 
-Not a startup. Not a company. A network building tools for autonomous agents on Nostr.
+Not a startup. Not a company. A solo builder creating infrastructure for autonomous agents on Nostr, one terminal session at a time.
 
 ---
 
 *Grant application prepared May 2026. All claims verified against GitHub search and live relay data at relay-snin.v2.site*
+*Developer location: Russia. Hardware costs reflect sanctioned market pricing.*
