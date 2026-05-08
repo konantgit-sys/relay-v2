@@ -37,7 +37,7 @@ AGENT_KEYS = {
     "support":      "028836071e3f9858d260cbe4247c5889f6fba9f9cb854eff88778c4a0dbb761169",
 }
 
-BASE_DIR = "/home/agent/data/agents_registry"
+BASE_DIR = os.getenv("AGENTS_REGISTRY_DIR", "/etc/snin-relay/agents_registry")
 
 # Map agent names to their keys.json directories
 AGENT_KEY_DIRS = {

@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger('heartbeat')
 
 # ── Config ──
-AGENTS_REGISTRY = "/home/agent/data/agents_registry"
+AGENTS_REGISTRY = os.getenv("AGENTS_REGISTRY_DIR", "/etc/snin-relay/agents_registry")
 RELAY_WS = "ws://127.0.0.1:8198"  # local connection
 RELAY_API = "http://127.0.0.1:8198"
 HEARTBEAT_INTERVAL = 600  # 10 minutes

@@ -38,7 +38,15 @@ V3.0 Improvements:
   ✅ NIP-89 Recommended Handlers (kind:31989, kind:31990)
 """
 
-import asyncio, json, sqlite3, hashlib, time, os, re, logging
+import asyncio
+import hashlib
+import json
+import logging
+import os
+import re
+import sqlite3
+import sys
+import time
 from aiohttp import web, WSMsgType
 from pathlib import Path
 from collections import defaultdict
@@ -53,8 +61,8 @@ from dao_groups import DAOGroupPoster
 from dao_voting import DAOVoting
 
 # ── Config ──
-BASE = Path("/home/agent/data/sites/relay")
-DB_PATH = BASE / "relay_v2.db"
+BASE = Path(os.getenv("RELAY_BASE", os.path.dirname(os.path.abspath(__file__))))
+DB_PATH = Path(os.getenv("RELAY_DB_PATH", str(BASE / "relay_v2.db")))
 HOST, PORT = "0.0.0.0", 8198  # V2 on new port
 VERSION = "3.1.0"
 

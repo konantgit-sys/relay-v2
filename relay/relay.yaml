@@ -16,4 +16,4 @@ relay:
   version: '1.14'
 storage:
   max_event_size: 1048576
-  sqlite: /home/agent/data/sites/relay/relay.db
+  sqlite: relay.db
