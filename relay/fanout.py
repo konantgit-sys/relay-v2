@@ -31,7 +31,7 @@ DB_PATH = os.path.join(os.path.dirname(__file__), 'relay_v2.db')
 AGENT_PUBHEX = [
     "c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",  # aiantology
     "86a1f42cf649830a1dd61dd4f5faf90a5c46384f407cf1a734187191014f4378",  # analyst
-    "3b93c14d8ae134a1be6d6ba08e609d926ec1225bdcb962d5d8e9b16b0f7d2a35",  # anton
+    # Seed relay pubkeys (example — replace with real relay pubkeys)
     "2047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",  # aporia
     "ba66fbbf3eabd6330f0307e701bf7413716cb73280076a7aa6516a4bd3d6a843",  # archivist
     "c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",  # cryptontology

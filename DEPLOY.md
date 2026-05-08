@@ -10,7 +10,7 @@
 
 ```bash
 # 1. Clone
-git clone https://github.com/snin/relay-v2
+git clone https://github.com/konantgit-sys/relay-v2
 cd relay-v2
 
 # 2. Install dependencies

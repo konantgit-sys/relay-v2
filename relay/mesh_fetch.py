@@ -13,23 +13,8 @@ from datetime import datetime, timezone
 logger = logging.getLogger('mesh')
 
 # ── Agent pubkeys (Nostr 32-byte hex, no 02/03 prefix) ──
-# Derived from whitelist in relay_server_v2.py
+# Replace with your agent pubkeys before deployment
 AGENT_PUBKEYS = [
-    "147d6c45f5d12d5710c7d1571e6ff12df515bbe40d7640c957a2d3b932162790",  # aiantology
-    "a3dfff689567d8402771146c69e653829f245777de78f90e8becc5f198d245a4",  # analyst
-    "64f0bf504202aee3810952108b3ddad9e4e3285b73d6dda7a1855c98dc96ab5a",  # anton
-    "e7c578c86f0a3a535d334a1f7b85220871168eda420855c4f02cc1d405354498",  # aporia
-    "98185a965fde2a8520debe3c498118815612daa2e609f95c74636c12fdc7a712",  # archivist
-    "a0542326be9b89ad9aec6d37290855ed50261e0bb23484c3887f621a17ea0b8b",  # cryptontology
-    "8ae7965af1b61347bb9900b91cfa9487e4da2400bdb063521ad0850706ff5f96",  # cryter
-    "058b28ffa66d3fa23a589bcbb00a15e57dc736eaf073ae918b1ec820537ac26a",  # director
-    "92ed16c86de8b918beb14b7de963c982e65e9686c6d60fd2b8c73e13e7d19aa0",  # executor
-    "930971ce14f14c027d633335ed535c565c0464e6c2f4d8b05ff8361f37d92f69",  # forecaster
-    "9266d881c0fccc02a5beef86c0e7f2894ed754cc36054492a1f99c27b1e0a7be",  # marketing
-    "056f236b2a1b4b99d1bd796e9c6899cf04861752c1490dcb350ef43619be121b",  # randd
-    "9002b66c4d71dbb7f69bd7bee0338afb3ce38ad304c4eb2e043a4e02a4b058f9",  # security
-    "ba0034618ff724f70003a5f5b6c0cb4ed97f079acf3bf147c6eb4fd058531953",  # strategist
-    "b2264d6d559e6bc5642564b8126dfd513b9e0bac063a2020ea810d1fd87461b8",  # support
 ]
 
 

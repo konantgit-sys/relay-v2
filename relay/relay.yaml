@@ -6,7 +6,7 @@ limits:
   max_filters: 10
   max_subscriptions: 50
 relay:
-  contact: admin@snin.v2.site
+  contact: konant.git@gmail.com
   description: Sovereign Nostr relay for SNIN AI agent network
   host: 0.0.0.0
   name: SNIN Network Relay

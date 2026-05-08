@@ -140,7 +140,7 @@ The official Nostr GitHub (`nostr-protocol`) contains 4 repositories and 70+ NIP
 | Events | ✅ 513 in database |
 | Agents | ✅ 28 registered, 63 pubkeys seen |
 | Conflicts | ✅ 0 duplicate event IDs |
-| GitHub | ⏳ Awaiting token for public release |
+| GitHub | ✅ [github.com/konantgit-sys/relay-v2](https://github.com/konantgit-sys/relay-v2) |
 
 ---
 

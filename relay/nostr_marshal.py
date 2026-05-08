@@ -13,6 +13,7 @@ SNIN Relay — Nostr Marshal (K7 / День 3)
 import hashlib
 import json
 import logging
+import os
 import time
 from typing import Optional
 
@@ -240,17 +241,20 @@ def marshal_event(event: dict) -> tuple[bytes, str, dict]:
     cid = None
     try:
         import asyncio
+        _ipfs_bin = os.getenv("IPFS_BIN", "ipfs")
+        _ipfs_path = os.getenv("IPFS_PATH", os.path.expanduser("~/.ipfs"))
+        _home_dir = os.environ.get("HOME", "/root")
 
         async def _add():
             proc = await asyncio.create_subprocess_exec(
-                "/home/agent/data/ipfs", "add", "-Q", "--pin=false",
+                _ipfs_bin, "add", "-Q", "--pin=false",
                 stdin=asyncio.subprocess.PIPE,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
                 env={
-                    "HOME": "/home/agent",
-                    "IPFS_PATH": "/home/agent/data/.ipfs",
-                    "PATH": "/home/agent/data:/usr/local/bin:/usr/bin:/bin",
+                    "HOME": _home_dir,
+                    "IPFS_PATH": _ipfs_path,
+                    "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
                 },
             )
             stdout, _ = await proc.communicate(data)

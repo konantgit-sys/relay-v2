@@ -82,7 +82,7 @@ MAX_EVENT_SIZE = 1_000_000  # 1MB
 RELAY_NAME = "SNIN Network Relay V2"
 RELAY_DESC = "Sovereign Nostr relay for SNIN AI agent network — Quantum Leap Edition"
 RELAY_PUBKEY = ""  # set from env or config
-RELAY_CONTACT = "admin@snin.v2.site"
+RELAY_CONTACT = "konant.git@gmail.com"
 SOFTWARE = "https://github.com/snin/relay-v2"
 
 # NIP-42: какие kinds разрешены аутентифицированным пользователям
@@ -91,34 +91,8 @@ PUBLIC_WRITE_KINDS = {1, 7, 9734, 9735, 10002}  # заметки, реакции
 
 # SNIN Agent whitelist pubkeys (16 agents)
 WHITELIST = [
-    "022047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",
-    "0224446e7c5b42c88fac01c83bcb2a8953ec9665e8835cc39af4303003841f2f68",
-    "023b93c14d8ae134a1be6d6ba08e609d926ec1225bdcb962d5d8e9b16b0f7d2a35",
-    "0267fb50e1139c62ad45f9e519eea7a19cbba4538f489d26b5646b451c5e65f12e",
-    "026dcf915162d77891d06028de2ee10ce10e767d1acab412adaf3c2e2affd98e1c",
-    "02733080edaaed6b056fa7fbff73e5d43914c31f2845af25bff91f1969a2d52d9c",
-    "0286a1f42cf649830a1dd61dd4f5faf90a5c46384f407cf1a734187191014f4378",
-    "028836071e3f9858d260cbe4247c5889f6fba9f9cb854eff88778c4a0dbb761169",
-    "02a36a56b32054467ac6815b3ba6d84818c59c9dc97d174899b005d1f73ec118bf",
-    "02ba66fbbf3eabd6330f0307e701bf7413716cb73280076a7aa6516a4bd3d6a843",
-    "02bd8979c65f3290f6790bf3a611fd5a0058bf42ef97b5ea281109312c71979835",
-    "02c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",
-    "02f44e3a8683ac627b13e15abe9731859f30694dd4b4d730cb6c4318546c385c7a",
-    "02f8b54d33551f131540816bd77e580d62d889ade8240aa4e3afb35bee7fb6b716",
-    "2047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",
-    "24446e7c5b42c88fac01c83bcb2a8953ec9665e8835cc39af4303003841f2f68",
-    "3b93c14d8ae134a1be6d6ba08e609d926ec1225bdcb962d5d8e9b16b0f7d2a35",
-    "67fb50e1139c62ad45f9e519eea7a19cbba4538f489d26b5646b451c5e65f12e",
-    "6dcf915162d77891d06028de2ee10ce10e767d1acab412adaf3c2e2affd98e1c",
-    "733080edaaed6b056fa7fbff73e5d43914c31f2845af25bff91f1969a2d52d9c",
-    "86a1f42cf649830a1dd61dd4f5faf90a5c46384f407cf1a734187191014f4378",
-    "8836071e3f9858d260cbe4247c5889f6fba9f9cb854eff88778c4a0dbb761169",
-    "a36a56b32054467ac6815b3ba6d84818c59c9dc97d174899b005d1f73ec118bf",
-    "ba66fbbf3eabd6330f0307e701bf7413716cb73280076a7aa6516a4bd3d6a843",
-    "bd8979c65f3290f6790bf3a611fd5a0058bf42ef97b5ea281109312c71979835",
-    "c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",
-    "f44e3a8683ac627b13e15abe9731859f30694dd4b4d730cb6c4318546c385c7a",
-    "f8b54d33551f131540816bd77e580d62d889ade8240aa4e3afb35bee7fb6b716",
+    # Add your agent pubkeys here before deployment
+    # Example: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
 ]
 # V3.0: NIP-26 delegation whitelist (delegatee -> delegator)
 DELEGATIONS = {}  # filled from DB on startup
@@ -1774,22 +1748,8 @@ async def admin_dao_votes(request):
 # ── Main ──
 
 # NIP-05: name -> pubkey mapping for snin-relay.v2.site
+# Replace with your agent pubkeys before deployment
 NIP05_NAMES = {
-    "aiantology": "022047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",
-    "analyst": "024916bbcf9c06134d7b5835b97cc9de94d0111187cfd6a32021daaec5feac3b3b",
-    "anton": "024fa7282d22a47e39dedf0b5fad4d72eef8d4d6a72367e2a21b5b3a3c6ec6bff7",
-    "aporia": "02126c9f86ae15556ef72ea8a6c8485b3a5f5cdb69f5f5df475c46e5ec6433c122",
-    "archivist": "02114564e4e7e77f9b7873fba0fa66853a08dece7e64eda4843eb9f0372bd59f19",
-    "cryptontology": "022047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",
-    "cryter": "023bfbd7e2d9a6b4a87553f85f794f8ad2aec3a9a60345a3c920acc8f8c1fc3943",
-    "director": "0260f7d754f819a673e4aaf6e563dcbc3044924098e92f344ef0a8c8c355480c20",
-    "executor": "0283f8fb950a63aaeae799adc2a87d0785a004481a5f8f28ab2a8a0597e18b4a18",
-    "forecaster": "021d188a5539b008d80bd06a54f1555e1ad092a5e44afbdc12cb2b9dd1b8e055f8",
-    "marketing": "020c5c133f9f7b4db76a7b65aaf45d99f19625e63c8a7a41885c34c70b53734946",
-    "randd": "028c87218143c61f40428d3f2e4bb9f33515611fde9407aed8c99b98a747fc1987",
-    "security": "02235aed9000097f9ac82dca48ae52e4faff9e1eee10c7ad1238aa3deacb5f54e8",
-    "strategist": "02952cd0b4a139b49acf5a8f8e7a7d066cd2578f769da4aae670c77bc8ef7eb6f3",
-    "support": "024b45deaa2a4a8e7bb8b7a3bb4d59cd82ebdd8c23f44a80145187729bc7e18727",
 }
 NIP05_IDENTITY = "snin-relay.v2.site"
 
@@ -1872,23 +1832,9 @@ async def main():
     app.router.add_get("/api/agents", admin_agents)
     app.router.add_get("/api/agents/{pubkey}", admin_agent_detail)
     
-    # Seed agents
+    # Seed agents — configure your agent list before deployment
     agent_names = [
-        ("aiantology", "social pulse"),
-        ("analyst", "market analyst"),
-        ("anton", "agent manager"),
-        ("aporia", "philosopher"),
-        ("archivist", "historian"),
-        ("cryptontology", "ontology"),
-        ("cryter", "pulse broadcaster"),
-        ("director", "CEO / strategist"),
-        ("executor", "ops executor"),
-        ("forecaster", "prediction"),
-        ("marketing", "growth"),
-        ("randd", "research & dev"),
-        ("security", "security auditor"),
-        ("strategist", "game theory"),
-        ("support", "user support"),
+        # ("agent_name", "agent_role"),
     ]
     agents_dict = {}
     for (name, role), pubhex in zip(agent_names, WHITELIST):
@@ -1914,52 +1860,17 @@ async def main():
     
     registered = len(db.get_agents())
     
-    # Seed DAO groups
+    # Seed DAO groups — configure after adding agent pubkeys to WHITELIST
     groups_config = [
-        {
-            "id": "strategy",
-            "name": "SNIN Strategy",
-            "about": "Strategic decisions, consensus proposals, long-term planning",
-            "pubkey": WHITELIST[7],  # director
-            "members": [
-                WHITELIST[7],   # director
-                WHITELIST[13],  # strategist
-                WHITELIST[3],   # aporia
-                WHITELIST[0],   # aiantology
-                WHITELIST[6],   # cryter
-            ],
-        },
-        {
-            "id": "market",
-            "name": "SNIN Market",
-            "about": "Market analysis, Bitcoin price, trading signals, economic trends",
-            "pubkey": WHITELIST[1],  # analyst
-            "members": [
-                WHITELIST[1],   # analyst
-                WHITELIST[9],   # forecaster
-                WHITELIST[10],  # marketing
-                WHITELIST[6],   # cryter
-            ],
-        },
-        {
-            "id": "dev",
-            "name": "SNIN Development",
-            "about": "Code reviews, releases, infrastructure, security patches",
-            "pubkey": WHITELIST[11],  # randd
-            "members": [
-                WHITELIST[11],  # randd
-                WHITELIST[8],   # executor
-                WHITELIST[12],  # security
-                WHITELIST[2],   # anton
-            ],
-        },
-        {
-            "id": "general",
-            "name": "SNIN General",
-            "about": "General chat for all SNIN DAO agents",
-            "pubkey": WHITELIST[6],  # cryter
-            "members": WHITELIST[:],  # all 15 agents
-        },
+        # Add your DAO groups here
+        # Example:
+        # {
+        #     "id": "general",
+        #     "name": "SNIN General",
+        #     "about": "General chat for all SNIN DAO agents",
+        #     "pubkey": WHITELIST[0],
+        #     "members": WHITELIST[:],
+        # },
     ]
     db.init_groups(groups_config)
     groups_count = len(db.get_groups())

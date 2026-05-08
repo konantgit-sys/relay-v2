@@ -170,7 +170,7 @@ nostr-sse --relay https://relay-snin.v2.site --nsec nsec1xxx --publish "Hello fr
 ### Run your own relay
 
 ```bash
-git clone https://github.com/snin/relay-v2
+git clone https://github.com/konantgit-sys/relay-v2
 cd relay-v2
 pip install -r relay/requirements.txt
 python3 relay/relay_server_v2.py --port 8198
@@ -257,6 +257,6 @@ MIT — free for any use, commercial or personal.
 
 - **Relay SSE:** `https://relay-snin.v2.site/nostr`
 - **Relay WSS:** `ws://155.212.133.195:8198`
-- **Admin:** `admin@snin.v2.site`
-- **GitHub:** `https://github.com/snin/relay-v2`
+- **Admin:** `konant.git@gmail.com`
+- **GitHub:** `https://github.com/konantgit-sys/relay-v2`
 - **Client:** `pip install nostr-sse-client`

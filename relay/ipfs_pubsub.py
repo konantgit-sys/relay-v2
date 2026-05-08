@@ -14,12 +14,12 @@ import time
 
 logger = logging.getLogger('ipfs_pubsub')
 
-IPFS_BIN = "/home/agent/data/ipfs"
-TOPIC = "snin-dao"
+IPFS_BIN = os.getenv("IPFS_BIN", "ipfs")
+TOPIC = os.getenv("IPFS_TOPIC", "snin-dao")
 DEFAULT_ENV = {
-    "HOME": os.environ.get("HOME", "/home/agent"),
-    "IPFS_PATH": "/home/agent/data/.ipfs",
-    "PATH": "/home/agent/data:/usr/local/bin:/usr/bin:/bin",
+    "HOME": os.environ.get("HOME", "/root"),
+    "IPFS_PATH": os.getenv("IPFS_PATH", os.path.expanduser("~/.ipfs")),
+    "PATH": os.environ.get("PATH", "/usr/local/bin:/usr/bin:/bin"),
 }
 
 

@@ -19,43 +19,15 @@ import time
 logger = logging.getLogger('dao_groups')
 
 # Agent → key file mapping
+# Replace with your agent pubkeys before deployment
 AGENT_KEYS = {
-    "aiantology":      "02c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",
-    "analyst":      "0286a1f42cf649830a1dd61dd4f5faf90a5c46384f407cf1a734187191014f4378",
-    "anton":      "023b93c14d8ae134a1be6d6ba08e609d926ec1225bdcb962d5d8e9b16b0f7d2a35",
-    "aporia":      "022047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",
-    "archivist":      "02ba66fbbf3eabd6330f0307e701bf7413716cb73280076a7aa6516a4bd3d6a843",
-    "cryptontology":      "02c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",
-    "cryter":      "02a36a56b32054467ac6815b3ba6d84818c59c9dc97d174899b005d1f73ec118bf",
-    "director":      "02f44e3a8683ac627b13e15abe9731859f30694dd4b4d730cb6c4318546c385c7a",
-    "executor":      "0267fb50e1139c62ad45f9e519eea7a19cbba4538f489d26b5646b451c5e65f12e",
-    "forecaster":      "026dcf915162d77891d06028de2ee10ce10e767d1acab412adaf3c2e2affd98e1c",
-    "marketing":      "02733080edaaed6b056fa7fbff73e5d43914c31f2845af25bff91f1969a2d52d9c",
-    "randd":      "02f8b54d33551f131540816bd77e580d62d889ade8240aa4e3afb35bee7fb6b716",
-    "security":      "02bd8979c65f3290f6790bf3a611fd5a0058bf42ef97b5ea281109312c71979835",
-    "strategist":      "0224446e7c5b42c88fac01c83bcb2a8953ec9665e8835cc39af4303003841f2f68",
-    "support":      "028836071e3f9858d260cbe4247c5889f6fba9f9cb854eff88778c4a0dbb761169",
 }
 
 BASE_DIR = os.getenv("AGENTS_REGISTRY_DIR", "/etc/snin-relay/agents_registry")
 
 # Map agent names to their keys.json directories
+# Replace with your agent directory paths before deployment
 AGENT_KEY_DIRS = {
-    "aiantology":   "cryptoantology",
-    "analyst":      "analyst_ai",
-    "anton":        "anton_ai",
-    "aporia":       "aporialab",
-    "archivist":    "archivist_ai",
-    "cryptontology":"cryptoantology",
-    "cryter":       "cryter",
-    "director":     "director_ai",
-    "executor":     "executor_ai",
-    "forecaster":   "forecaster_ai",
-    "marketing":    "marketing_ai",
-    "randd":        "rnd_ai",
-    "security":     "security_ai",
-    "strategist":   "strategist_ai",
-    "support":      "support_ai",
 }
 
 RELAY_URL = "wss://snin-relay.v2.site"
