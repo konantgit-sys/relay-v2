@@ -27,9 +27,19 @@ jobs:
           pip install -r relay/requirements.txt
           pip install pytest pytest-cov pytest-asyncio
 
+      - name: Start relay for tests
+        run: |
+          python relay/relay_server_v2.py &
+          sleep 3
+          echo "✅ Relay ready on :8198"
+
       - name: Run relay tests
         run: |
           python -m pytest relay/test_relay_nips.py -v --asyncio-mode=auto --cov=relay --cov-report=term-missing
+
+      - name: Kill relay
+        run: |
+          pkill -f relay_server_v2.py || true
 
       - name: Run nostr-sse-client tests (if any)
         run: |
