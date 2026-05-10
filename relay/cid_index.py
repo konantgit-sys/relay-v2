@@ -1,11 +1,11 @@
 """
 SNIN Relay — CID Index
-SQLite-индекс для поиска event.id → IPFS CID.
+SQLite index for event.id → IPFS CID lookup.
 
-Позволяет:
-- По event.id найти CID (чтобы забрать событие из IPFS)
-- По pubkey найти список CID (история агента)
-- По kind найти события (фильтр по типу)
+Features:
+- Lookup CID by event.id (retrieve event from IPFS)
+- Find CID list by pubkey (agent history)
+- Find events by kind (type filter)
 """
 
 import json
@@ -20,7 +20,7 @@ DB_PATH_DEFAULT = os.path.join(os.path.dirname(__file__), "relay_v2.db")
 
 
 class CIDIndex:
-    """CID Index — привязка Nostr event.id к IPFS CID."""
+    """CID Index — maps Nostr event.id to IPFS CID."""
 
     def __init__(self, db_path: str = DB_PATH_DEFAULT):
         self.db_path = db_path
@@ -46,15 +46,15 @@ class CIDIndex:
         self._db.execute("CREATE INDEX IF NOT EXISTS idx_cid_kind ON cid_index(kind)")
         self._db.execute("CREATE INDEX IF NOT EXISTS idx_cid_created ON cid_index(created_at)")
         self._db.commit()
-        logger.debug(f"CID Index: {self._get_count()} записей")
+        logger.debug(f"CID Index: {self._get_count()} records")
 
     def _get_count(self):
         return self._db.execute("SELECT COUNT(*) FROM cid_index").fetchone()[0]
 
     def add(self, event_id: str, cid: str, pubkey: str = "",
             kind: int = -1, created_at: int = 0) -> bool:
-        """Добавить запись event_id → CID.
-        Если запись уже существует — обновить (UPSERT)."""
+        """Add event_id → CID record.
+        If record exists — update (UPSERT)."""
         try:
             self._db.execute("""
                 INSERT INTO cid_index (event_id, cid, pubkey, kind, created_at)
@@ -70,8 +70,8 @@ class CIDIndex:
             return False
 
     def add_batch(self, entries: list[tuple]) -> int:
-        """Добавить пачкой: [(event_id, cid, pubkey, kind, created_at), ...].
-        Возвращает количество добавленных."""
+        """Batch add: [(event_id, cid, pubkey, kind, created_at), ...].
+        Returns count added."""
         count = 0
         try:
             self._db.executemany("""
@@ -85,14 +85,14 @@ class CIDIndex:
         return count
 
     def get_by_event_id(self, event_id: str) -> str | None:
-        """Найти CID по event.id."""
+        """Find CID by event.id."""
         row = self._db.execute(
             "SELECT cid FROM cid_index WHERE event_id = ?", (event_id,)
         ).fetchone()
         return row["cid"] if row else None
 
     def get_by_pubkey(self, pubkey: str, limit: int = 20) -> list[dict]:
-        """Найти CID по pubkey (от newest к oldest)."""
+        """Find CID by pubkey (newest to oldest)."""
         rows = self._db.execute("""
             SELECT event_id, cid, kind, created_at
             FROM cid_index
@@ -103,7 +103,7 @@ class CIDIndex:
         return [dict(r) for r in rows]
 
     def get_by_kind(self, kind: int, limit: int = 50) -> list[dict]:
-        """Найти CID по kind."""
+        """Find CID by kind."""
         rows = self._db.execute("""
             SELECT event_id, cid, pubkey, created_at
             FROM cid_index
@@ -114,7 +114,7 @@ class CIDIndex:
         return [dict(r) for r in rows]
 
     def get_recent(self, limit: int = 20) -> list[dict]:
-        """Последние N записей."""
+        """Last N records."""
         rows = self._db.execute("""
             SELECT event_id, cid, pubkey, kind, created_at
             FROM cid_index
@@ -124,7 +124,7 @@ class CIDIndex:
         return [dict(r) for r in rows]
 
     def get_stats(self) -> dict:
-        """Статистика индекса."""
+        """Index statistics."""
         total = self._get_count()
         by_kind = {}
         rows = self._db.execute(
@@ -151,7 +151,7 @@ class CIDIndex:
         }
 
     def delete(self, event_id: str) -> bool:
-        """Удалить запись по event.id."""
+        """Delete record by event.id."""
         try:
             self._db.execute("DELETE FROM cid_index WHERE event_id = ?", (event_id,))
             self._db.commit()

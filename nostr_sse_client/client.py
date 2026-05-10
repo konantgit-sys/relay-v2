@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Nostr SSE Client — подключается к relay через HTTP SSE вместо WebSocket.
+Nostr SSE Client — connects to relay via HTTP SSE instead of WebSocket.
 
-Использование:
+Usage:
   python3 nostr_sse_client.py --relay https://relay-snin.v2.site --gen-key
   python3 nostr_sse_client.py --relay https://relay-snin.v2.site --subscribe '{"kinds":[1],"limit":5}'
   python3 nostr_sse_client.py --relay https://relay-snin.v2.site --publish "Hello from SSE client!"
 
-Без WebSocket Upgrade — только SSE (POST /nostr).
+No WebSocket Upgrade — only SSE (POST /nostr).
 """
 
 import json, hashlib, time, sys, os, argparse, threading
@@ -860,10 +860,10 @@ def cmd_dashboard(relay_url: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Nostr SSE Client — подключение к relay через HTTP SSE",
+        description="Nostr SSE Client — connects to relay via HTTP SSE",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Примеры:
+Examples:
   python3 nostr_sse_client.py --relay https://relay-snin.v2.site --gen-key
   python3 nostr_sse_client.py --relay https://relay-snin.v2.site --subscribe '{"kinds":[1],"limit":5}'
   python3 nostr_sse_client.py --relay https://relay-snin.v2.site --nsec nsec1... --publish "Hello Nostr!"

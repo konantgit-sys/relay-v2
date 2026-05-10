@@ -37,3 +37,10 @@ __pycache__/
 *.db-shm
 *.db-wal
 relay/blobs/
+
+# Config files with local paths
+relay/relay.yaml
+port.txt
+.protocol_state.json
+relay_v2.log
+

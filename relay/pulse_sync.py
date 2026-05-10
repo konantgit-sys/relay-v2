@@ -13,9 +13,9 @@ from typing import Optional
 
 logger = logging.getLogger('pulse_sync')
 
-# Import Cryter's relay list path
-CRYTER_RELAY_PATH = "/home/agent/data/agents/cryter_v2/cryter_v7/src/core/relay_health_monitor.py"
-CRYTER_BLACKLIST_PATH = "/home/agent/data/agents/cryter_v2/cryter_v7/data/relay_blacklist.json"
+# Cryter relay list paths (set via env for production; fallback to empty = local scan only)
+CRYTER_RELAY_PATH = os.getenv("CRYTER_RELAY_PATH", "")
+CRYTER_BLACKLIST_PATH = os.getenv("CRYTER_BLACKLIST_PATH", "")
 
 # Fallback relay list if Cryter's file isn't available
 FALLBACK_RELAYS = [

@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
 """SNIN Relay V2.0 — Quantum Leap Edition
-NIPs: 01, 09, 11, 12, 20, 26, 29, 33, 40, 42, 45, 50, 56, 57, 86, 96, 04, 13, 71, 89, 94
 
-Архитектура:
+Architecture:
   aiohttp + SQLite WAL + Tag indexing + NIP-42 AUTH + NIP-29 Groups + NIP-50 Search
   + Rate limiting + Admin REST API + HealthCache mirror + NIP-86 RPC + NIP-96 Blossom
   + NIP-04 Encrypted DMs + NIP-13 Proof of Work + NIP-71 Video Events
   + NIP-94 File Metadata + NIP-89 Recommended Handlers
 
-Квантовые улучшения против V1.0:
-  ✅ NIP-42 Auth (challenge-response подпись)
-  ✅ NIP-29 Groups (SNIN DAO каналы с whitelist)
-  ✅ NIP-50 Search (FTS5 полнотекстовый поиск)
-  ✅ Tag indexing (индексация p/e/a/t тегов)
-  ✅ Rate limiting (token bucket на IP)
-  ✅ Admin REST API (статистика, управление, health)
+V2.0 Improvements over V1.0:
+  ✅ NIP-42 Auth (challenge-response signature)
+  ✅ NIP-29 Groups (SNIN DAO channels with whitelist)
+  ✅ NIP-50 Search (FTS5 full-text search)
+  ✅ Tag indexing (p/e/a/t tags)
+  ✅ Rate limiting (token bucket per IP)
+  ✅ Admin REST API (stats, management, health)
   ✅ Ping/pong keepalive
-  ✅ HealthCache mirror (релеи знают друг о друге)
-  ✅ NIP-86 RPC (управление через JSON-RPC)
+  ✅ HealthCache mirror (relays know each other)
+  ✅ NIP-86 RPC (JSON-RPC management)
   ✅ NIP-09 (event deletion kind:5)
   ✅ NIP-65 (relay list metadata kind:10002)
-  ✅ NIP-96 Blossom (файловое хранилище)
+  ✅ NIP-96 Blossom (file storage)
 
 V3.0 Improvements:
-  ✅ WebSocket idle timeout (60s без сообщений = отключение)
+  ✅ WebSocket idle timeout (60s without message = disconnect)
   ✅ SQLite write lock (asyncio.Lock — deadlock prevention)
-  ✅ Max event size (1MB лимит)
-  ✅ WS rate limiting (token bucket на сообщения/события)
+  ✅ Max event size (1MB limit)
+  ✅ WS rate limiting (token bucket per message/event)
   ✅ NIP-26 Delegated Event Signing
   ✅ NIP-33 Parameterized Replaceable Events
   ✅ NIP-56 Reporting (kind:1984)
@@ -52,7 +51,7 @@ from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 from pulse_sync import PulseSync, load_cryter_relays
-CRYTER_PUBKEY = "02a36a56b32054467ac6815b3ba6d84818c59c9dc97d174899b005d1f73ec118bf"
+CRYTER_PUBKEY = os.getenv("CRYTER_PUBKEY", "02a36a56b32054467ac6815b3ba6d84818c59c9dc97d174899b005d1f73ec118bf")
 from mesh_fetch import MeshFetcher
 from fanout import Fanout
 from mass_pulse import MassPulse
@@ -81,19 +80,17 @@ MAX_EVENT_SIZE = 1_000_000  # 1MB
 # Relay info
 RELAY_NAME = "SNIN Network Relay V2"
 RELAY_DESC = "Sovereign Nostr relay for SNIN AI agent network — Quantum Leap Edition"
-RELAY_PUBKEY = ""  # set from env or config
+RELAY_PUBKEY = os.getenv("RELAY_PUBKEY", "")  # set from env for NIP-11
 RELAY_CONTACT = "konant.git@gmail.com"
 SOFTWARE = "https://github.com/snin/relay-v2"
 
-# NIP-42: какие kinds разрешены аутентифицированным пользователям
-AUTH_REQUIRED_WRITE = True  # внешние не могут писать без AUTH
-PUBLIC_WRITE_KINDS = {1, 7, 9734, 9735, 10002}  # заметки, реакции, zaps, relay list
+# NIP-42: which kinds are allowed for authenticated users
+AUTH_REQUIRED_WRITE = True  # external cannot write without AUTH
+PUBLIC_WRITE_KINDS = {1, 7, 9734, 9735, 10002}  # notes, reactions, zaps, relay list
 
-# SNIN Agent whitelist pubkeys (16 agents)
-WHITELIST = [
-    # Add your agent pubkeys here before deployment
-    # Example: "abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
-]
+# Agent whitelist from env (comma-separated hex pubkeys)
+WHITELIST_ENV = os.getenv("AGENT_WHITELIST", "")
+WHITELIST = [pk.strip() for pk in WHITELIST_ENV.split(",") if len(pk.strip()) == 64]
 # V3.0: NIP-26 delegation whitelist (delegatee -> delegator)
 DELEGATIONS = {}  # filled from DB on startup
 
@@ -1074,7 +1071,7 @@ class NostrWSHandler:
                 logger.debug(f"NIP-26: {pubkey[:16]}... delegated by {delegator[:16]}...")
         
         # V3.1: NIP-42 — permission tiers
-        # WHITELIST: полный доступ (все kinds)
+        # WHITELIST: full access (all kinds)
         # Authenticated (NIP-42): PUBLIC_WRITE_KINDS
         # Unauthenticated: read-only (reject write)
         if effective_pubkey not in WHITELIST and pubkey not in WHITELIST:
@@ -1228,7 +1225,7 @@ class NostrWSHandler:
             return
         
         # V3.0: NIP-13 — optional Proof of Work check
-        # Если в событии есть nonce тег — проверяем что первые difficulty бит нулевые
+        # If event has nonce tag — check first difficulty bits are zero
         nonce_tag = None
         difficulty = 0
         for t in event.get('tags', []):
@@ -1284,7 +1281,7 @@ class NostrWSHandler:
                 elif kind == 1112:
                     self.dao_voting.handle_vote(event)
             
-# Auto-Fanout — все события от агентов SNIN летят на 520 relay
+# Auto-Fanout — all SNIN agent events fanned to 520 relays
             should_fanout = hasattr(self, 'fanout') and (
                 effective_pubkey == CRYTER_PUBKEY or
                 effective_pubkey in WHITELIST or
@@ -1394,32 +1391,32 @@ h1 {{ font-size:2em; color:#00d4ff; margin-bottom:8px; }}
 <p class="subtitle">Sovereign Nostr Infrastructure · Version {VERSION}</p>
 
 <div class="grid">
-<div class="card green"><div class="value">{stats.get('events',0):,}</div><div class="label">Событий</div></div>
-<div class="card"><div class="value">{stats.get('authors',0):,}</div><div class="label">Авторов</div></div>
+<div class="card green"><div class="value">{stats.get('events',0):,}</div><div class="label">Events</div></div>
+<div class="card"><div class="value">{stats.get('authors',0):,}</div><div class="label">Authors</div></div>
 <div class="card green"><div class="value">{alive:,}</div><div class="label">Relay Alive</div></div>
 <div class="card"><div class="value">{fstats.get('published',0):,}</div><div class="label">Fanout</div></div>
 </div>
 
 <div class="section">
 <h2>📡 Fanout Engine</h2>
-<div class="info-row"><span class="label">Всего relay в БД</span><span class="value">{total:,}</span></div>
-<div class="info-row"><span class="label">Живых relay</span><span class="value" style="color:#00ff88">{alive:,}</span></div>
-<div class="info-row"><span class="label">Событий разослано</span><span class="value">{fstats.get('broadcast',0):,}</span></div>
-<div class="info-row"><span class="label">Relay затронуто</span><span class="value">{fstats.get('total_relays_hit',0):,}</span></div>
+<div class="info-row"><span class="label">Total relays in DB</span><span class="value">{total:,}</span></div>
+<div class="info-row"><span class="label">Alive relays</span><span class="value" style="color:#00ff88">{alive:,}</span></div>
+<div class="info-row"><span class="label">Events broadcast</span><span class="value">{fstats.get('broadcast',0):,}</span></div>
+<div class="info-row"><span class="label">Relays hit</span><span class="value">{fstats.get('total_relays_hit',0):,}</span></div>
 </div>
 
 <div class="section">
 <h2>🔐 NIP-42 Authentication</h2>
-<div class="info-row"><span class="label">Write без AUTH</span><span class="value" style="color:#ff4444">Только чтение</span></div>
+<div class="info-row"><span class="label">Write without AUTH</span><span class="value" style="color:#ff4444">Read-only</span></div>
 <div class="info-row"><span class="label">AUTH (NIP-42)</span><span class="value" style="color:#00ff88">kind:1, 7, 9734, 9735</span></div>
-<div class="info-row"><span class="label">Whitelist</span><span class="value" style="color:#ff8800">15 SNIN агентов</span></div>
+<div class="info-row"><span class="label">Whitelist</span><span class="value" style="color:#ff8800">15 SNIN agents</span></div>
 </div>
 
 <div class="howto">
-<h2>🔌 Подключение</h2>
-<p>Nostr клиент:</p>
+<h2>🔌 Connection</h2>
+<p>Nostr client:</p>
 <code>wss://snin-relay.v2.site</code>
-<p>NIP-42 AUTH для публикации заметок:</p>
+<p>NIP-42 AUTH required for posting:</p>
 <code>["AUTH", {{...}}]</code>
 </div>
 
@@ -1760,7 +1757,7 @@ async def handle_nip05(request):
         return web.json_response({
             "names": {name: NIP05_NAMES[name]},
         })
-    # Если name не указан или не найден — отдаём всех
+    # If name not found — return all
     return web.json_response({
         "names": NIP05_NAMES,
     })

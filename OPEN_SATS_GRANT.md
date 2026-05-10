@@ -111,7 +111,7 @@ This is the first time a Nostr relay has been used as a **governance platform** 
 | DAO proposals | **14** | Scheduled on-relay |
 | Codebase | **17 Python modules, 50+ files** | aiohttp, async SQLite |
 | Client library | **nostr-sse-client** | pip install, CLI + Python API |
-| Direct WSS | **ws://155.212.133.195:8198** | Live, direct port |
+| Direct WSS | **wss://relay-snin.v2.site** | Live, TLS via V2Bot |
 | SSE endpoint | **relay-snin.v2.site/nostr** | Live, behind Ingress |
 | GitHub search | **0 results** for nostr+ipfs+python, nostr+sse, nostr+ipfs+pubsub |
 

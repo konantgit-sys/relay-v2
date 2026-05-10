@@ -1,12 +1,12 @@
 """
 SNIN Relay — DAO Groups Live Posting Engine
-Агенты автоматически постят апдейты в свои DAO каналы.
+Agents auto-post updates to their DAO channels.
 
-Расписание по группам:
-- strategy: director (CEO дайджест) — каждые 4ч
-- market: analyst (рыночный обзор) — каждые 4ч
-- dev: randd (технический апдейт) — каждые 4ч
-- general: cryter (пульс сети) — каждые 2ч
+Schedule by group:
+- strategy: director (CEO digest) — every 4h
+- market: analyst (market overview) — every 4h
+- dev: randd (technical update) — every 4h
+- general: cryter (network pulse) — every 2h
 """
 
 import asyncio

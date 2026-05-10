@@ -1,10 +1,10 @@
 """
-SNIN Relay — Nostr Marshal (K7 / День 3)
+SNIN Relay — Nostr Marshal
 
-Сериализация/десериализация Nostr событий в IPFS-совместимый формат.
-Проверка целостности: id = SHA256(event_json), sig = Schnorr verify.
+Nostr event serialization/deserialization for IPFS-compatible format.
+Integrity check: id = SHA256(event_json), sig = Schnorr verify.
 
-Поток:
+Flow:
   event → marshal_event(event) → bytes → ipfs add → CID
   CID → ipfs cat → bytes → unmarshal_event(bytes) → event
   verify_integrity(event) → True/False
@@ -19,9 +19,9 @@ from typing import Optional
 
 logger = logging.getLogger("nostr_marshal")
 
-# ── Константы ──────────────────────────────────────────────
+# ── Constants ──────────────────────────────────────────────
 NOSTR_EVENT_KEYS = ["id", "pubkey", "created_at", "kind", "tags", "content", "sig"]
-SERIALIZE_ORDER = [0, "pubkey", "created_at", "kind", "tags", "content"]  # для id
+SERIALIZE_ORDER = [0, "pubkey", "created_at", "kind", "tags", "content"]  # for id
 
 RELAY_META = {
     "source_relay": "snin-relay.v2.site",
@@ -30,16 +30,16 @@ RELAY_META = {
 }
 
 
-# ── Сериализация ───────────────────────────────────────────
+# ── Serialization ───────────────────────────────────────────
 
 def serialize_event(event: dict, canonical: bool = False) -> bytes:
     """Nostr event → JSON bytes.
 
-    Если canonical=True — использует канонический формат
-    для id verification: [0, pubkey, created_at, kind, tags, content]
+    If canonical=True — uses canonical format
+    for id verification: [0, pubkey, created_at, kind, tags, content]
     """
     if canonical:
-        # Канонический формат для вычисления id (NIP-01)
+        # Canonical format for id computation (NIP-01)
         obj = [
             0,
             event["pubkey"],
@@ -49,7 +49,7 @@ def serialize_event(event: dict, canonical: bool = False) -> bytes:
             event.get("content", ""),
         ]
     else:
-        # Полный формат для IPFS (с id, sig, meta)
+        # Full format for IPFS (with id, sig, meta)
         obj = {
             "nostr": {
                 "id": event["id"],
@@ -72,10 +72,10 @@ def serialize_event(event: dict, canonical: bool = False) -> bytes:
 def deserialize_event(data: bytes) -> Optional[dict]:
     """JSON bytes → Nostr event dict.
 
-    Поддерживает:
-    - Полный формат IPFS: {"nostr": {...}, "meta": {...}}
-    - Канонический: [0, pubkey, ts, kind, tags, content]
-    - Плоский: {"id": "...", ...}
+    Supports:
+    - Full IPFS format: {"nostr": {...}, "meta": {...}}
+    - Canonical: [0, pubkey, ts, kind, tags, content]
+    - Flat: {"id": "...", ...}
     """
     try:
         obj = json.loads(data)
@@ -83,24 +83,24 @@ def deserialize_event(data: bytes) -> Optional[dict]:
         logger.warning(f"deserialize: JSON decode error: {e}")
         return None
 
-    # Полный формат IPFS
+    # Full IPFS format
     if isinstance(obj, dict) and "nostr" in obj:
         event = obj["nostr"]
-        # Проверка наличия всех обязательных полей
+        # Check all required fields exist
         for key in ["id", "pubkey", "created_at", "kind", "content", "sig"]:
             if key not in event:
                 logger.warning(f"deserialize: missing field '{key}' in nostr")
                 return None
         return event
 
-    # Плоский формат
+    # Flat format
     if isinstance(obj, dict) and "id" in obj and "pubkey" in obj:
         return obj
 
-    # Канонический формат (массив)
+    # Canonical format (array)
     if isinstance(obj, list) and len(obj) >= 6:
         return {
-            "id": "",  # будет вычислено
+            "id": "",  # will be computed
             "pubkey": obj[1],
             "created_at": obj[2],
             "kind": obj[3],
@@ -116,7 +116,7 @@ def deserialize_event(data: bytes) -> Optional[dict]:
 # ── ID Verification (NIP-01) ───────────────────────────────
 
 def compute_event_id(event: dict) -> str:
-    """Вычисляет id события по NIP-01."""
+    """Compute event id per NIP-01."""
     tags = event.get("tags", [])
     content = event.get("content", "")
     raw = json.dumps(
@@ -128,7 +128,7 @@ def compute_event_id(event: dict) -> str:
 
 
 def verify_event_id(event: dict) -> bool:
-    """Проверяет, что id = SHA256(event)."""
+    """Verify id = SHA256(event)."""
     computed = compute_event_id(event)
     expected = event.get("id", "")
     if computed != expected:
@@ -140,9 +140,9 @@ def verify_event_id(event: dict) -> bool:
 # ── Schnorr Signature Verification (NIP-01) ────────────────
 
 def verify_schnorr(event: dict) -> bool:
-    """Проверяет подпись Schnorr (NIP-01).
+    """Verify Schnorr signature (NIP-01).
 
-    Использует nostr_protocol.Event.from_json + verify.
+    Uses nostr_protocol.Event.from_json + verify.
     """
     try:
         from nostr_protocol import Event
@@ -161,7 +161,7 @@ def verify_schnorr(event: dict) -> bool:
 # ── Public API ─────────────────────────────────────────────
 
 def verify_integrity(event: dict) -> dict:
-    """Полная проверка целостности события.
+    """Full event integrity check.
 
     Returns:
         {"valid": True/False, "checks": {...}, "error": "..."}
@@ -179,7 +179,7 @@ def verify_integrity(event: dict) -> dict:
         "error": None,
     }
 
-    # Проверка наличия полей
+    # Check field presence
     for field in ["id", "pubkey", "sig"]:
         if field in event and event[field]:
             result["checks"][f"has_{field}"] = True
@@ -199,21 +199,21 @@ def verify_integrity(event: dict) -> dict:
         result["error"] = "missing signature"
         return result
 
-    # Проверка id
+    # Verify id
     result["checks"]["id_match"] = verify_event_id(event)
     if not result["checks"]["id_match"]:
         result["valid"] = False
         result["error"] = "event id mismatch"
         return result
 
-    # Проверка подписи
+    # Verify signature
     result["checks"]["sig_valid"] = verify_schnorr(event)
     if not result["checks"]["sig_valid"]:
         result["valid"] = False
         result["error"] = "invalid schnorr signature"
         return result
 
-    # Проверка kind (известные типы)
+    # Verify kind (known types)
     known_kinds = {0, 1, 2, 3, 4, 5, 6, 7, 40, 41, 42, 43, 44,
                    1063, 1984, 1985, 22222, 30023, 31989, 31990, 34235,
                    39000, 39001, 39002, 39003}
@@ -224,7 +224,7 @@ def verify_integrity(event: dict) -> dict:
 
 
 def marshal_event(event: dict) -> tuple[bytes, str, dict]:
-    """Полный цикл: event → bytes → CID (через IPFS-add).
+    """Full cycle: event → bytes → CID (via IPFS-add).
 
     Args:
         event: Nostr event dict
@@ -232,12 +232,12 @@ def marshal_event(event: dict) -> tuple[bytes, str, dict]:
     Returns:
         (json_bytes, cid_str, integrity_result)
 
-    Если IPFS недоступен — возвращает только bytes.
+    If IPFS unavailable — return bytes only.
     """
     data = serialize_event(event)
     integrity = verify_integrity(event)
 
-    # Попытка добавить в IPFS
+    # Attempt to add to IPFS
     cid = None
     try:
         import asyncio
@@ -270,30 +270,30 @@ def marshal_event(event: dict) -> tuple[bytes, str, dict]:
 
 
 def unmarshal_event(data: bytes, expected_id: str = None) -> Optional[dict]:
-    """Bytes → event dict с проверкой целостности.
+    """Bytes → event dict with integrity check.
 
     Args:
         data: JSON bytes из IPFS
-        expected_id: если задан — проверяет совпадение id
+        expected_id: if set — validates id match
 
     Returns:
-        event dict или None при ошибке
+        event dict or None on error
     """
     event = deserialize_event(data)
     if not event:
         return None
 
-    # Если id пустой (канонический формат) — вычисляем
+    # If id empty (canonical format) — compute it
     if not event.get("id"):
         event["id"] = compute_event_id(event)
 
-    # Проверка целостности
+    # Integrity check
     integrity = verify_integrity(event)
     if not integrity["valid"]:
         logger.warning(f"unmarshal: integrity check failed: {integrity['error']}")
         return None
 
-    # Проверка ожидаемого id
+    # Verify expected id
     if expected_id and event["id"] != expected_id:
         logger.warning(f"unmarshal: id mismatch: {event['id'][:20]}... != {expected_id[:20]}...")
         return None
@@ -304,7 +304,7 @@ def unmarshal_event(data: bytes, expected_id: str = None) -> Optional[dict]:
 # ── Batch Processing ───────────────────────────────────────
 
 def marshal_batch(events: list[dict]) -> list[tuple]:
-    """Пакетная обработка списка событий.
+    """Batch process event list.
 
     Returns:
         [(bytes, cid, integrity), ...]
@@ -315,7 +315,7 @@ def marshal_batch(events: list[dict]) -> list[tuple]:
 # ── Self-test ──────────────────────────────────────────────
 
 def _create_test_event(event_id: str = None) -> dict:
-    """Создаёт подписанное тестовое событие через EventBuilder."""
+    """Create signed test event via EventBuilder."""
     from nostr_protocol import Keys, EventBuilder, Tag, Kind
     import secrets
 
@@ -334,13 +334,13 @@ def _create_test_event(event_id: str = None) -> dict:
     signed_json = json.loads(signed.as_json())
 
     if event_id:
-        signed_json["id"] = event_id  # принудительно
+        signed_json["id"] = event_id  # forced
 
     return signed_json
 
 
 def test() -> dict:
-    """Прогон всех тестов. Возвращает результаты."""
+    """Run all tests. Returns results."""
     results = {"tests": [], "passed": 0, "failed": 0, "errors": []}
 
     def check(name, ok, detail=""):
@@ -351,7 +351,7 @@ def test() -> dict:
             results["failed"] += 1
             results["errors"].append(f"{name}: {detail}")
 
-    # 1. Сериализация и десериализация
+    # 1. Serialization and deserialization
     event = _create_test_event()
     data = serialize_event(event)
     restored = deserialize_event(data)
@@ -359,7 +359,7 @@ def test() -> dict:
     if restored:
         check("id preserved", restored["id"] == event["id"])
 
-    # 2. Каноническая сериализация
+    # 2. Canonical serialization
     canonical = serialize_event(event, canonical=True)
     check("canonical format", isinstance(canonical, bytes) and len(canonical) > 0)
 
@@ -388,18 +388,18 @@ def test() -> dict:
     int_tampered = verify_integrity(tampered)
     check("integrity: tampered", not int_tampered["valid"])
 
-    # 8. Маршалинг (без IPFS — фейковый CID)
+    # 8. Marshaling (no IPFS — fake CID)
     data_bytes, cid, integ = marshal_event(event)
     check("marshal: bytes", isinstance(data_bytes, bytes) and len(data_bytes) > 0)
     check("marshal: integrity", integ["valid"])
 
-    # 9. Анмаршалинг
+    # 9. Unmarshaling
     restored2 = unmarshal_event(data_bytes, expected_id=event["id"])
     check("unmarshal", restored2 is not None)
     if restored2:
         check("unmarshal: content match", restored2["content"] == event["content"])
 
-    # 10. Анмаршалинг с неверным id
+    # 10. Unmarshaling with wrong id
     restored_bad = unmarshal_event(data_bytes, expected_id="0000000000000000000000000000000000000000000000000000000000000000")
     check("unmarshal: bad id reject", restored_bad is None)
 
@@ -407,15 +407,15 @@ def test() -> dict:
     can_event = deserialize_event(serialize_event(event, canonical=True))
     check("canonical deserialize", can_event is not None)
 
-    # 12. Пустые данные
+    # 12. Empty data
     empty = deserialize_event(b"")
     check("empty data", empty is None)
 
-    # 13. Мусор
+    # 13. Garbage
     garbage = deserialize_event(b"not json at all{{{")
     check("garbage data", garbage is None)
 
-    # Результат
+    # Result
     status = "ALL PASSED" if results["failed"] == 0 else f"{results['failed']} FAILED"
     logger.info(f"Nostr Marshal test: {status} ({results['passed']}/{len(results['tests'])})")
 

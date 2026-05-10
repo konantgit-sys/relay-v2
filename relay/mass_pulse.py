@@ -1,7 +1,7 @@
 """
 SNIN Relay — Mass PulseSync
-Сканирует ВСЕ известные Nostr relays на живость (1791+ relay).
-Сохраняет alive/dead в SQLite. Работает в фоне.
+Scans ALL known Nostr relays for liveness (1791+ relay).
+Stores alive/dead in SQLite. Runs in background.
 """
 
 import asyncio
@@ -17,14 +17,14 @@ logger = logging.getLogger('mass_pulse')
 RELAY_LIST_PATH = os.path.join(os.path.dirname(__file__), 'all_known_relays.txt')
 DB_PATH = os.path.join(os.path.dirname(__file__), 'relay_v2.db')
 
-BATCH_SIZE = 100       # конкурентных проверок
-TIMEOUT = 4            # секунд на relay
-SCAN_INTERVAL = 600   # пересканировать раз в час
-PULSE_KEEP_MIN = 120   # хранить alive-статус минимум 2 часа
+BATCH_SIZE = 100       # concurrent checks
+TIMEOUT = 4            # seconds per relay
+SCAN_INTERVAL = 600   # rescan every hour
+PULSE_KEEP_MIN = 120   # keep alive status min 2 hours
 
 
 class MassPulse:
-    """Сканирует тысячи relay на живость."""
+    """Scan thousands of relays for liveness."""
 
     def __init__(self, db_path: str = DB_PATH):
         self._relays: list[str] = self._load_relays()
@@ -104,7 +104,7 @@ class MassPulse:
             logger.error(f"DB save error for {url}: {e}")
 
     async def _check_relay(self, session: aiohttp.ClientSession, url: str) -> bool:
-        """Проверить один relay через NIP-11 (GET) + WSS fallback."""
+        """Check one relay via NIP-11 (GET) + WSS fallback."""
         try:
             # Method 1: NIP-11 info endpoint
             http_url = url.replace('wss://', 'https://').replace('ws://', 'http://')
@@ -138,7 +138,7 @@ class MassPulse:
             return False
 
     async def scan_once(self, progress_callback=None):
-        """Один полный проход по всем relay."""
+        """One full pass over all relays."""
         self._scanning = True
         self._progress = {"total": len(self._relays), "checked": 0, "alive": 0, "dead": 0}
         

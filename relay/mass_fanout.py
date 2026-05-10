@@ -1,7 +1,7 @@
 """
 SNIN Relay — Mass Fanout Engine
-Публикует события на ВСЕ живые relay (520+) вместо обычных 30.
-Работает асинхронно, батчами по 50 relay.
+Broadcasts events to ALL alive relays (520+) instead of usual 30.
+Async, batches of 50 relays.
 """
 
 import asyncio
@@ -15,19 +15,19 @@ import sqlite3
 logger = logging.getLogger('mass_fanout')
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'relay_v2.db')
-BATCH_SIZE = 50       # relay на один батч
-TIMEOUT = 10          # таймаут на один relay
-RATE_LIMIT = 0.05     # задержка между relay внутри батча
+BATCH_SIZE = 50       # relays per batch
+TIMEOUT = 10          # timeout per relay
+RATE_LIMIT = 0.05     # delay between relays within batch
 
 
 class MassFanout:
-    """Фан-аутит события на тысячи relay."""
+    """Fanouts events to thousands of relays."""
 
     def __init__(self, db_path: str = DB_PATH):
         self._db_path = db_path
         self._sent_count = 0
         self._failed_count = 0
-        self._cache_ttl = 300  # обновлять список живых relay раз в 5 мин
+        self._cache_ttl = 300  # refresh alive relay list every 5 min
         self._alive_cache = []
         self._cache_time = 0
         self._task: asyncio.Task | None = None
@@ -55,8 +55,8 @@ class MassFanout:
 
     async def fanout_event(self, event_json: dict) -> dict:
         """
-        Публикует событие на все живые relay.
-        Возвращает статистику отправки.
+        Publish event to all alive relays.
+        Returns send statistics.
         """
         relays = self._get_alive()
         if not relays:
@@ -93,7 +93,7 @@ class MassFanout:
                     f"{sent}/{i + len(batch)} sent, {failed} failed"
                 )
                 
-                await asyncio.sleep(0.1)  # между батчами пауза
+                await asyncio.sleep(0.1)  # pause between batches
         
         self._sent_count += sent
         self._failed_count += failed
@@ -111,7 +111,7 @@ class MassFanout:
         return stats
 
     async def _send_to_relay(self, session: aiohttp.ClientSession, url: str, msg: str) -> bool:
-        """Отправить событие на один relay через WebSocket."""
+        """Send event to one relay via WebSocket."""
         try:
             async with session.ws_connect(url, timeout=TIMEOUT, max_msg_size=0) as ws:
                 await ws.send_str(msg)

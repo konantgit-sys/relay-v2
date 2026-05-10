@@ -1,9 +1,9 @@
 """
 SNIN Relay — IPFS Pubsub Engine
-Обёртка над IPFS CLI для публикации/подписки Nostr событий.
+Wrapper over IPFS CLI for publishing/subscribing Nostr events.
 
-Использует ipfs CLI (не API), т.к. pubsub в kubo 0.32.0
-работает стабильно только через CLI.
+Uses ipfs CLI (not API), because pubsub in kubo 0.32.0
+works stably only via CLI.
 """
 
 import asyncio
@@ -24,7 +24,7 @@ DEFAULT_ENV = {
 
 
 class IPFSPubsub:
-    """IPFS pubsub publish/subscribe для Nostr событий."""
+    """IPFS pubsub publish/subscribe for Nostr events."""
 
     def __init__(self, ipfs_bin=IPFS_BIN, topic=TOPIC):
         self.ipfs = ipfs_bin
@@ -35,8 +35,8 @@ class IPFSPubsub:
         self._last_peer_check = 0
 
     async def add_event(self, event: dict) -> str:
-        """Nostr event → IPFS объект → CID.
-        Возвращает CID строку."""
+        """Nostr event → IPFS object → CID.
+        Returns CID string."""
         obj = {
             "nostr": {
                 "id": event["id"],
@@ -69,7 +69,7 @@ class IPFSPubsub:
         return cid
 
     async def get_event(self, cid: str) -> dict | None:
-        """CID → IPFS объект → Nostr event."""
+        """CID → IPFS object → Nostr event."""
         proc = await asyncio.create_subprocess_exec(
             self.ipfs, "cat", cid,
             stdout=asyncio.subprocess.PIPE,
@@ -88,7 +88,7 @@ class IPFSPubsub:
             return None
 
     async def publish_cid(self, cid: str) -> bool:
-        """Опубликовать CID в pubsub topic."""
+        """Publish CID to pubsub topic."""
         proc = await asyncio.create_subprocess_exec(
             self.ipfs, "pubsub", "pub", self.topic,
             stdin=asyncio.subprocess.PIPE,
@@ -104,8 +104,8 @@ class IPFSPubsub:
         return True
 
     async def publish_event(self, event: dict) -> str:
-        """Полный цикл: event → add → pubsub pub.
-        Возвращает CID."""
+        """Full cycle: event → add → pubsub pub.
+        Returns CID."""
         cid = await self.add_event(event)
         ok = await self.publish_cid(cid)
         if not ok:
@@ -114,8 +114,8 @@ class IPFSPubsub:
         return cid
 
     async def subscribe_loop(self, on_event_callback, on_error=None):
-        """Подписка на topic. Бесконечный цикл.
-        on_event_callback(event) — вызывается для каждого события.
+        """Subscribe to topic. Infinite loop.
+        on_event_callback(event) — called for each event.
         """
         logger.info(f"IPFS subscribing to topic '{self.topic}'...")
         while True:
@@ -126,7 +126,7 @@ class IPFSPubsub:
                     stderr=asyncio.subprocess.PIPE,
                     env=DEFAULT_ENV
                 )
-                # Читаем CID-строки из stdout (по одной в строке)
+                # Read CID strings from stdout (one per line)
                 while True:
                     line = await proc.stdout.readline()
                     if not line:
@@ -141,8 +141,8 @@ class IPFSPubsub:
                         if event:
                             await on_event_callback(event)
                         else:
-                            # CID есть, но не содержит Nostr event
-                            # (может быть от другой системы)
+                            # CID exists but contains no Nostr event
+                            # ((may be from another system))
                             pass
                     except Exception as e:
                         logger.warning(f"Process CID {cid}: {e}")
@@ -155,10 +155,10 @@ class IPFSPubsub:
                 logger.error(f"IPFS sub error: {e}")
                 if on_error:
                     await on_error(None, e)
-                await asyncio.sleep(5)  # переподключение
+                await asyncio.sleep(5)  # reconnect
 
     async def get_peers(self) -> int:
-        """Количество пиров в swarm."""
+        """Peer count in swarm."""
         now = time.time()
         if now - self._last_peer_check < 60:
             return self._peers

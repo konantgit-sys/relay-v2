@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""SNIN Relay V3.0 — Integration Tests for New NIPs
-Тестирует: NIP-26, NIP-33, NIP-56, NIP-51, NIP-42, rate limiting, timeout
-
-Запуск: python3 test_relay_nips.py
-"""
+# SNIN Relay V3.0 — Integration Tests for New NIPs
+# Tests: NIP-26, NIP-33, NIP-56, NIP-51, NIP-42, rate limiting, timeout
+#
+# Run: python3 -m pytest relay/test_relay_nips.py --asyncio-mode=auto -v
 
 import asyncio
 import json
@@ -69,12 +68,12 @@ async def test_nip11():
     
     required_nips = [1, 9, 11, 12, 20, 26, 29, 33, 40, 42, 45, 50, 56, 86, 96]
     ok = all(nip in data.get('supported_nips', []) for nip in required_nips)
-    log_test("NIP-11: все 15 NIP в supported_nips", ok,
+    log_test("NIP-11: all 15 core NIPs in supported_nips", ok,
              f"got {data.get('supported_nips', [])}")
 
 
 async def test_basic_event():
-    """Базовый EVENT/REQ (NIP-01) — relay принимает и отдаёт события."""
+    """Basic EVENT/REQ (NIP-01) — relay accepts and returns events."""
     ws = await connect_ws()
     
     test_pubkey = "02" + "a" * 62
@@ -86,7 +85,7 @@ async def test_basic_event():
     resp = await asyncio.wait_for(ws.recv(), timeout=5)
     ok_msg = json.loads(resp)
     ok = ok_msg[0] == "OK" and ok_msg[1] == event['id'] and ok_msg[2] == True
-    log_test("NIP-01: EVENT принят", ok, str(ok_msg))
+    log_test("NIP-01: EVENT accepted", ok, str(ok_msg))
     
     # Subscribe and check
     await ws.send(json.dumps(["REQ", "test_sub", {"ids": [event['id']]}]))
@@ -100,7 +99,7 @@ async def test_basic_event():
             recvd.append(data)
     
     ok = any(e[2]['id'] == event['id'] for e in recvd)
-    log_test("NIP-01: REQ находит событие", ok, f"found {len(recvd)} events")
+    log_test("NIP-01: REQ finds event", ok, f"found {len(recvd)} events")
     
     await ws.close()
 
@@ -137,7 +136,7 @@ async def test_nip26_delegation():
     resp = await asyncio.wait_for(ws.recv(), timeout=5)
     ok_msg = json.loads(resp)
     ok = ok_msg[0] == "OK" and ok_msg[2] == True
-    log_test("NIP-26: делегация зарегистрирована", ok, str(ok_msg))
+    log_test("NIP-26: delegation registered", ok, str(ok_msg))
     
     # Check via admin API
     import aiohttp
@@ -146,7 +145,7 @@ async def test_nip26_delegation():
             data = await resp.json()
     
     ok = delegate_pubkey in data.get('delegations', {})
-    log_test("NIP-26: делегация видна в /api/delegations", ok,
+    log_test("NIP-26: delegation visible in /api/delegations", ok,
              f"count={data.get('count', 0)}")
     
     await ws.close()
@@ -226,7 +225,7 @@ async def test_nip56_reporting():
             data = await resp.json()
     
     ok = data['count'] >= 3
-    log_test("NIP-56: 3+ reports зарегистрированы", ok, f"count={data['count']}")
+    log_test("NIP-56: 3+ reports registered", ok, f"count={data['count']}")
     
     # Check if target was auto-banned
     async with aiohttp.ClientSession() as session:
@@ -240,7 +239,7 @@ async def test_nip56_reporting():
     # Note: target might not be banned since reports are from diff reporters
     # and the auto-ban check in relay uses store_report_async
     # which might not have the right pubkey matching
-    log_test("NIP-56: /api/reports endpoint работает", True,
+    log_test("NIP-56: /api/reports endpoint works", True,
              f"banned_count={len(banned_pubkeys)}")
     
     await ws.close()
@@ -263,7 +262,7 @@ async def test_nip51_lists():
     resp = await asyncio.wait_for(ws.recv(), timeout=5)
     ok_msg = json.loads(resp)
     ok = ok_msg[0] == "OK" and ok_msg[2] == True
-    log_test("NIP-51: mute list принят", ok, str(ok_msg))
+    log_test("NIP-51: mute list accepted", ok, str(ok_msg))
     
     # Publish event from muted pubkey
     test_pubkey = "02" + "i" * 62
@@ -288,14 +287,14 @@ async def test_nip51_lists():
     
     # Note: the relay filters mute in _handle_req, which requires authed_pubkey
     # Since our subscriber isn't authenticated, this test checks basic storage
-    log_test("NIP-51: событие kind:10000 сохранено",
+    log_test("NIP-51: kind:10000 event saved",
              ok_msg[2] == True, "mute filter requires NIP-42 auth")
     
     await ws.close()
 
 
 async def test_rate_limiting():
-    """Rate limiting: проверяем что rate limit срабатывает."""
+    """Rate limiting: verify rate limit triggers."""
     ws = await connect_ws()
     
     # Send many events quickly
@@ -320,20 +319,20 @@ async def test_rate_limiting():
             rejected += 1
     
     ok = rejected > 0
-    log_test("Rate limiting: события отклоняются при превышении", ok,
+    log_test("Rate limiting: events rejected when exceeded", ok,
              f"accepted={accepted} rejected={rejected}")
     
     await ws.close()
 
 
 async def test_idle_timeout():
-    """V3.0: Проверяем что idle timeout настроен (NIP-11 max_message_length)."""
+    """V3.0: Verify idle timeout is configured (NIP-11 max_message_length)."""
     import aiohttp
     async with aiohttp.ClientSession() as session:
         async with session.get(API_URL) as resp:
             data = await resp.json()
     has_timeout = data.get('limitation', {}).get('max_message_length', 0) > 0
-    log_test("V3.0: idle timeout настроен (max_message_length=1MB)", has_timeout,
+    log_test("V3.0: idle timeout configured (max_message_length=1MB)", has_timeout,
              f"max_msg={data.get('limitation', {}).get('max_message_length', 0)}")
 
 
@@ -361,7 +360,7 @@ async def test_blossom():
 
 
 async def test_admin_endpoints():
-    """V3.0: Новые admin endpoints."""
+    """V3.0: New admin endpoints."""
     import aiohttp
     endpoints = [
         ("/api/reports", "reports"),
@@ -395,7 +394,7 @@ async def run_all():
     
     tests = [
         ("NIP-11", test_nip11()),
-        ("Базовый EVENT/REQ", test_basic_event()),
+        ("Basic EVENT/REQ", test_basic_event()),
         ("NIP-42 Auth", test_nip42_auth()),
         ("NIP-26 Delegation", test_nip26_delegation()),
         ("NIP-33 Replaceable", test_nip33_replaceable()),
