@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SNIN Network — Управление</title>
+<style>
+:root {
+  --primary: #00ff88;
+  --primary-dark: #00cc6a;
+  --danger: #ff3355;
+  --warning: #ffaa00;
+  --success: #00ff88;
+  --dark-bg: #0a0e27;
+  --dark-card: #111633;
+  --dark-border: #2a3a66;
+  --text: #e8f0ff;
+  --text-muted: #7890bb;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  background: linear-gradient(135deg, #0a0e27 0%, #0d1530 50%, #0a0e27 100%);
+  color: var(--text); padding: 24px; min-height: 100vh;
+}
+h1 { font-size: 24px; margin-bottom: 6px; }
+.subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 24px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.card {
+  background: var(--dark-card); border: 1px solid var(--dark-border);
+  border-radius: 12px; padding: 18px; transition: all 0.3s;
+}
+.card:hover { border-color: var(--primary); }
+.card h3 { font-size: 14px; color: var(--text-muted); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.card .big { font-size: 32px; font-weight: 700; color: var(--primary); }
+.card .label { color: var(--text-muted); font-size: 12px; }
+.tag {
+  display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;
+}
+.tag-real { background: rgba(0,255,136,0.15); color: var(--success); }
+.tag-sim { background: rgba(255,170,0,0.15); color: var(--warning); }
+.cmd-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cmd-table td { padding: 6px 8px; border-bottom: 1px solid rgba(42,58,102,0.5); }
+.cmd-table tr:last-child td { border: none; }
+.cmd-code { 
+  background: rgba(0,255,136,0.1); color: var(--primary);
+  font-family: 'SF Mono', monospace; font-size: 12px;
+  padding: 2px 6px; border-radius: 4px;
+}
+.cmd-desc { color: var(--text-muted); font-size: 12px; }
+.event-item {
+  padding: 8px 10px; border-left: 3px solid var(--dark-border);
+  margin-bottom: 6px; border-radius: 0 6px 6px 0; font-size: 13px;
+}
+.event-item.kind-8010 { border-color: var(--primary); }
+.event-item.kind-8011 { border-color: var(--danger); }
+.event-item.kind-8015 { border-color: var(--warning); }
+pre { background: rgba(0,0,0,0.3); padding: 12px; border-radius: 8px; overflow-x: auto; font-size: 12px; color: var(--text-muted); max-height: 300px; }
+</style>
+</head>
+<body>
+
+<h1>⚙ SNIN Network</h1>
+<p class="subtitle">Sovereign Nostr Infrastructure · NIP-80 · Multi-Relay · <span id="liveStatus">проверка...</span></p>
+
+<div class="grid">
+  <div class="card">
+    <h3>📡 Relay</h3>
+    <div class="big" id="relayEvents">—</div>
+    <div class="label">событий</div>
+    <div style="margin-top:8px;font-size:12px;color:var(--text-muted)">
+      Авторов: <span id="relayAuthors">—</span> · NIPs: <span id="relayNips">—</span>
+    </div>
+  </div>
+  <div class="card">
+    <h3>📊 Достоверность данных</h3>
+    <div style="margin-bottom:6px"><span class="tag tag-sim">🔸 Телеметрия — симуляция</span></div>
+    <div style="margin-bottom:6px"><span class="tag tag-real">🟢 Nostr kind:1 — реальные</span></div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
+      ⚠ Реальных ESP32 сейчас нет. Все kind:8010-8017 — автогенерация для демо.
+    </div>
+  </div>
+  <div class="card">
+    <h3>🎮 Telegram Bot</h3>
+    <div style="font-size:16px;font-weight:700;margin-bottom:6px">@Snindaobot</div>
+    <div style="font-size:12px;color:var(--text-muted);margin-bottom:10px">
+      Управляй сетью через Telegram — команды, подписки, push-уведомления
+    </div>
+    <a href="https://t.me/Snindaobot" target="_blank" style="display:inline-block;padding:8px 16px;background:var(--primary);color:var(--dark-bg);border-radius:8px;font-weight:600;font-size:13px;text-decoration:none">🤖 Открыть бота</a>
+  </div>
+</div>
+
+<div class="grid">
+  <div class="card">
+    <h3>🔔 Подписки на события</h3>
+    <table class="cmd-table">
+      <tr><td><span class="cmd-code">/subkind 8010</span></td><td class="cmd-desc">📊 Телеметрия</td></tr>
+      <tr><td><span class="cmd-code">/subkind 8011</span></td><td class="cmd-desc">🚨 Алерты</td></tr>
+      <tr><td><span class="cmd-code">/subkind 8015</span></td><td class="cmd-desc">📍 GPS</td></tr>
+      <tr><td><span class="cmd-code">/subkind 8017</span></td><td class="cmd-desc">💚 Heartbeat</td></tr>
+      <tr><td><span class="cmd-code">/subkind all</span></td><td class="cmd-desc">📡 Все события</td></tr>
+      <tr><td><span class="cmd-code">/watchdev &lt;device&gt;</span></td><td class="cmd-desc">👁️ Устройство</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>🎮 Команды устройствам</h3>
+    <table class="cmd-table">
+      <tr><td><span class="cmd-code">/cmd &lt;dvc&gt; read_sensor</span></td><td class="cmd-desc">Прочитать датчики</td></tr>
+      <tr><td><span class="cmd-code">/cmd &lt;dvc&gt; set_interval 60</span></td><td class="cmd-desc">Изменить интервал</td></tr>
+      <tr><td><span class="cmd-code">/cmd &lt;dvc&gt; reboot</span></td><td class="cmd-desc">Перезагрузить</td></tr>
+      <tr><td><span class="cmd-code">/cmd &lt;dvc&gt; pause</span></td><td class="cmd-desc">Пауза</td></tr>
+      <tr><td><span class="cmd-code">/cmd &lt;dvc&gt; config {...}</span></td><td class="cmd-desc">Конфиг</td></tr>
+    </table>
+  </div>
+  <div class="card">
+    <h3>📋 Основные команды бота</h3>
+    <table class="cmd-table">
+      <tr><td><span class="cmd-code">/relay</span></td><td class="cmd-desc">📡 Статус релея</td></tr>
+      <tr><td><span class="cmd-code">/relays</span></td><td class="cmd-desc">🌐 Multi-Relay</td></tr>
+      <tr><td><span class="cmd-code">/sub</span></td><td class="cmd-desc">🔔 Все уведомления</td></tr>
+      <tr><td><span class="cmd-code">/subrelay</span></td><td class="cmd-desc">📡 Relay health</td></tr>
+      <tr><td><span class="cmd-code">/help</span></td><td class="cmd-desc">❓ Полный список</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h3>📡 Multi-Relay Status</h3>
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px" id="relayGrid">
+    <div style="color:var(--text-muted);font-size:13px">Загрузка...</div>
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:16px">
+  <h3>📜 События из relay (kind:8010-8017)</h3>
+  <div id="eventLog" style="min-height:60px">
+    <div style="color:var(--text-muted);font-size:13px">Загрузка...</div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>📄 Relay API raw</h3>
+  <pre id="relayRaw">Загрузка...</pre>
+</div>
+
+<script>
+const RELAY_API = 'https://relay-snin.v2.site';
+
+async function loadRelayStats() {
+  try {
+    const r = await fetch(RELAY_API + '/');
+    const d = await r.json();
+    document.getElementById('relayEvents').textContent = d.event_count || 0;
+    document.getElementById('relayAuthors').textContent = d.authors_count || 0;
+    document.getElementById('relayNips').textContent = (d.supported_nips || []).length;
+    document.getElementById('relayRaw').textContent = JSON.stringify(d, null, 2);
+    document.getElementById('liveStatus').innerHTML = '<span class="tag tag-real">🟢 online</span>';
+  } catch(e) {
+    document.getElementById('relayEvents').textContent = '✕';
+    document.getElementById('liveStatus').innerHTML = '<span style="color:var(--danger)">🔴 offline</span>';
+    document.getElementById('relayRaw').textContent = 'Relay недоступен: ' + e.message;
+  }
+}
+
+async function loadEvents() {
+  try {
+    const r = await fetch(RELAY_API + '/api/events?limit=10');
+    const events = await r.json();
+    const log = document.getElementById('eventLog');
+    if (!events || !events.length) {
+      log.innerHTML = '<div style="color:var(--text-muted);font-size:13px">Нет событий</div>';
+      return;
+    }
+    const kinds = {8010:'📊 Telemetry',8011:'🚨 Alert',8012:'🎮 Command',8013:'📦 Firmware',
+                   8014:'📋 Capabilities',8015:'📍 GPS',8016:'🔐 Auth',8017:'💚 Heartbeat'};
+    log.innerHTML = events.map(e => {
+      const kind = e.kind || 0;
+      const device = (e.tags||[]).find(t => t[0]==='d')?.[1] || '?';
+      const ts = e.created_at || 0;
+      const ago = ts ? Math.floor(Date.now()/1000 - ts) + 's' : '?';
+      let detail = (e.content||'').slice(0, 50);
+      try {
+        const c = JSON.parse(e.content);
+        if (kind === 8010) detail = `🌡️${c.temp}°C 💧${c.hum}% 🔋${c.battery}%`;
+        else if (kind === 8011) detail = `🚨 ${c.alert}`;
+        else if (kind === 8015) detail = `📍 ${c.lat},${c.lon}`;
+        else if (kind === 8017) detail = `💚 uptime:${c.uptime}s`;
+      } catch(_) {}
+      return `<div class="event-item kind-${kind}">
+        <strong>${kinds[kind]||'📄 kind:'+kind}</strong>
+        <span style="color:var(--text-muted)">·</span>
+        <code style="color:var(--primary);font-size:12px">${device}</code>
+        <span style="color:var(--text-muted)">· ${detail}</span>
+        <span style="float:right;color:var(--text-muted);font-size:11px">${ago}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('eventLog').innerHTML = '<div style="color:var(--danger);font-size:13px">Ошибка: '+e.message+'</div>';
+  }
+}
+
+async function loadRelays() {
+  try {
+    const r = await fetch('/api/multirelay');
+    const d = await r.json();
+    const relays = d.relays || [];
+    const grid = document.getElementById('relayGrid');
+    if (!relays.length) { grid.innerHTML = '<div style="color:var(--text-muted);font-size:13px">Нет данных</div>'; return; }
+    grid.innerHTML = relays.map(r => `
+      <div style="padding:10px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:13px">
+        <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${r.online?'var(--success)':'var(--danger)'};margin-right:6px"></span>${r.name||'?'}</div>
+        <div style="color:var(--text-muted);font-size:11px;margin-top:4px">${r.latency_ms||'?'}ms · ${r.accepted||0} evts</div>
+      </div>`).join('');
+  } catch(e) {
+    document.getElementById('relayGrid').innerHTML = '<div style="color:var(--text-muted);font-size:13px">Ошибка: '+e.message+'</div>';
+  }
+}
+
+loadRelayStats(); loadEvents(); loadRelays();
+setInterval(loadRelayStats, 30000);
+setInterval(loadEvents, 20000);
+setInterval(loadRelays, 60000);
+</script>
+</body>
+</html>
