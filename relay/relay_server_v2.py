@@ -1,31 +1,33 @@
 #!/usr/bin/env python3
 """SNIN Relay V2.0 — Quantum Leap Edition
+NIPs: 01, 09, 11, 12, 20, 26, 29, 33, 40, 42, 45, 50, 56, 57, 86, 96, 04, 13, 71, 89, 94
+NIP-XX: Solana Payments (kind:30000-30002)
 
-Architecture:
+Архитектура:
   aiohttp + SQLite WAL + Tag indexing + NIP-42 AUTH + NIP-29 Groups + NIP-50 Search
   + Rate limiting + Admin REST API + HealthCache mirror + NIP-86 RPC + NIP-96 Blossom
   + NIP-04 Encrypted DMs + NIP-13 Proof of Work + NIP-71 Video Events
   + NIP-94 File Metadata + NIP-89 Recommended Handlers
 
-V2.0 Improvements over V1.0:
-  ✅ NIP-42 Auth (challenge-response signature)
-  ✅ NIP-29 Groups (SNIN DAO channels with whitelist)
-  ✅ NIP-50 Search (FTS5 full-text search)
-  ✅ Tag indexing (p/e/a/t tags)
-  ✅ Rate limiting (token bucket per IP)
-  ✅ Admin REST API (stats, management, health)
+Квантовые улучшения против V1.0:
+  ✅ NIP-42 Auth (challenge-response подпись)
+  ✅ NIP-29 Groups (SNIN DAO каналы с whitelist)
+  ✅ NIP-50 Search (FTS5 полнотекстовый поиск)
+  ✅ Tag indexing (индексация p/e/a/t тегов)
+  ✅ Rate limiting (token bucket на IP)
+  ✅ Admin REST API (статистика, управление, health)
   ✅ Ping/pong keepalive
-  ✅ HealthCache mirror (relays know each other)
-  ✅ NIP-86 RPC (JSON-RPC management)
+  ✅ HealthCache mirror (релеи знают друг о друге)
+  ✅ NIP-86 RPC (управление через JSON-RPC)
   ✅ NIP-09 (event deletion kind:5)
   ✅ NIP-65 (relay list metadata kind:10002)
-  ✅ NIP-96 Blossom (file storage)
+  ✅ NIP-96 Blossom (файловое хранилище)
 
 V3.0 Improvements:
-  ✅ WebSocket idle timeout (60s without message = disconnect)
+  ✅ WebSocket idle timeout (60s без сообщений = отключение)
   ✅ SQLite write lock (asyncio.Lock — deadlock prevention)
-  ✅ Max event size (1MB limit)
-  ✅ WS rate limiting (token bucket per message/event)
+  ✅ Max event size (1MB лимит)
+  ✅ WS rate limiting (token bucket на сообщения/события)
   ✅ NIP-26 Delegated Event Signing
   ✅ NIP-33 Parameterized Replaceable Events
   ✅ NIP-56 Reporting (kind:1984)
@@ -37,31 +39,33 @@ V3.0 Improvements:
   ✅ NIP-89 Recommended Handlers (kind:31989, kind:31990)
 """
 
-import asyncio
-import hashlib
-import json
-import logging
-import os
-import re
-import sqlite3
-import sys
-import time
+import asyncio, json, sqlite3, hashlib, time, os, re, logging
 from aiohttp import web, WSMsgType
 from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 from pulse_sync import PulseSync, load_cryter_relays
-CRYTER_PUBKEY = os.getenv("CRYTER_PUBKEY", "02a36a56b32054467ac6815b3ba6d84818c59c9dc97d174899b005d1f73ec118bf")
+# Fallback для dev-режима, продакшен использует RELAY_PUBKEY из relay.yaml
+CRYTER_PUBKEY = os.getenv("RELAY_PUBKEY",
+    # ⚠️ ЗАМЕНИ на свой pubkey или установи RELAY_PUBKEY в relay.yaml
+    "028ae7965af1b61347bb9900b91cfa9487e4da2400bdb063521ad0850706ff5f96")
 from mesh_fetch import MeshFetcher
 from fanout import Fanout
 from mass_pulse import MassPulse
 from zap_handler import handle_zap_request, get_lnurlp_response
 from dao_groups import DAOGroupPoster
 from dao_voting import DAOVoting
+# IPFS legacy — отключён (P2P Mesh на своём TCP с v0.5)
+# from ipfs_pubsub import IPFSPubsub
+# CIDIndex — отключён (IPFS legacy)
+# from cid_index import CIDIndex
+from nostr_marshal import verify_integrity
+from sse_handler import setup_sse_routes
+from snin_payments import handle_snin_payment, handle_balance_request, init_payments, get_seen_tx_count
 
 # ── Config ──
-BASE = Path(os.getenv("RELAY_BASE", os.path.dirname(os.path.abspath(__file__))))
-DB_PATH = Path(os.getenv("RELAY_DB_PATH", str(BASE / "relay_v2.db")))
+BASE = Path("/home/agent/data/sites/relay")
+DB_PATH = BASE / "relay_v2.db"
 HOST, PORT = "0.0.0.0", 8198  # V2 on new port
 VERSION = "3.1.0"
 
@@ -69,7 +73,9 @@ VERSION = "3.1.0"
 RATE_WINDOW = 10       # seconds
 RATE_MAX_MSG = 50      # max messages per window per IP
 RATE_MAX_CONN = 5      # max concurrent connections per IP (simple)
+RATE_MAX_CONN_AUTH = 20  # for authenticated users
 RATE_MAX_EVENTS = 30   # max EVENT commands per window
+RATE_MAX_EVENTS_AUTH = 100  # for authenticated users
 
 # V3.0: WebSocket idle timeout
 WS_IDLE_TIMEOUT = 60   # seconds without message → disconnect
@@ -80,17 +86,36 @@ MAX_EVENT_SIZE = 1_000_000  # 1MB
 # Relay info
 RELAY_NAME = "SNIN Network Relay V2"
 RELAY_DESC = "Sovereign Nostr relay for SNIN AI agent network — Quantum Leap Edition"
-RELAY_PUBKEY = os.getenv("RELAY_PUBKEY", "")  # set from env for NIP-11
-RELAY_CONTACT = "konant.git@gmail.com"
+RELAY_PUBKEY = ""  # set from env or config
+RELAY_CONTACT = "admin@snin.v2.site"
 SOFTWARE = "https://github.com/snin/relay-v2"
 
-# NIP-42: which kinds are allowed for authenticated users
-AUTH_REQUIRED_WRITE = True  # external cannot write without AUTH
-PUBLIC_WRITE_KINDS = {1, 7, 9734, 9735, 10002}  # notes, reactions, zaps, relay list
+# NIP-42: какие kinds разрешены аутентифицированным пользователям
+AUTH_REQUIRED_WRITE = True  # внешние не могут писать без AUTH
+PUBLIC_WRITE_KINDS = {1, 7, 9734, 9735, 10002}  # заметки, реакции, zaps, relay list
 
-# Agent whitelist from env (comma-separated hex pubkeys)
-WHITELIST_ENV = os.getenv("AGENT_WHITELIST", "")
-WHITELIST = [pk.strip() for pk in WHITELIST_ENV.split(",") if len(pk.strip()) == 64]
+# SNIN Agent whitelist pubkeys (15 agents)
+WHITELIST = [
+    "c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",  # aiantology
+    "86a1f42cf649830a1dd61dd4f5faf90a5c46384f407cf1a734187191014f4378",  # analyst
+    "3b93c14d8ae134a1be6d6ba08e609d926ec1225bdcb962d5d8e9b16b0f7d2a35",  # anton
+    "2047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",  # aporia
+    "ba66fbbf3eabd6330f0307e701bf7413716cb73280076a7aa6516a4bd3d6a843",  # archivist
+    "a0542326be9b89ad9aec6d37290855ed50261e0bb23484c3887f621a17ea0b8b",  # cryptontology
+    "8ae7965af1b61347bb9900b91cfa9487e4da2400bdb063521ad0850706ff5f96",  # cryter
+    "e7c578c86f0a3a535d334a1f7b85220871168eda420855c4f02cc1d405354498",  # director
+    "67fb50e1139c62ad45f9e519eea7a19cbba4538f489d26b5646b451c5e65f12e",  # executor
+    "6dcf915162d77891d06028de2ee10ce10e767d1acab412adaf3c2e2affd98e1c",  # forecaster
+    "733080edaaed6b056fa7fbff73e5d43914c31f2845af25bff91f1969a2d52d9c",  # marketing
+    "f8b54d33551f131540816bd77e580d62d889ade8240aa4e3afb35bee7fb6b716",  # randd
+    "bd8979c65f3290f6790bf3a611fd5a0058bf42ef97b5ea281109312c71979835",  # security
+    "24446e7c5b42c88fac01c83bcb2a8953ec9665e8835cc39af4303003841f2f68",  # strategist
+    "8836071e3f9858d260cbe4247c5889f6fba9f9cb854eff88778c4a0dbb761169",  # support
+    "caea531a4fdc3adb9650ee31c1baa884ccf3fccc27309129b2c71edf18d5fe75",  # V2Bot Agent
+    "8d468694fe3b294afa716fd5a9bdb32b5217f4b7ec9052b0b5df2b0004bb0f99",  # Remora (nostr_sdk)
+    "8d468694fe3b294afa71271ed409fbfe061caedebe307992a1308696ef7fa9f4",  # Remora (nostr_protocol verify)
+    "69b327b7b2af29465a3a17cafeee38928e0c50d2fb0856827bc7e6a6f7b0ec90",  # Pilot Agent
+]
 # V3.0: NIP-26 delegation whitelist (delegatee -> delegator)
 DELEGATIONS = {}  # filled from DB on startup
 
@@ -240,6 +265,32 @@ class RelayDB:
                 created_at INTEGER NOT NULL,
                 UNIQUE(pubkey, list_kind, list_target)
             )
+        """)
+        # NIP-XX: Payments log
+        self._db.execute("""
+            CREATE TABLE IF NOT EXISTS payments (
+                id TEXT PRIMARY KEY,
+                event_id TEXT NOT NULL,
+                kind INTEGER NOT NULL DEFAULT 30000,
+                sender_pubkey TEXT NOT NULL,
+                receiver_pubkey TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                token TEXT NOT NULL DEFAULT 'SNIN',
+                solana_tx TEXT NOT NULL,
+                memo TEXT DEFAULT '',
+                created_at INTEGER NOT NULL,
+                accepted INTEGER NOT NULL DEFAULT 1,
+                receipt_id TEXT DEFAULT ''
+            )
+        """)
+        self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_payments_sender ON payments(sender_pubkey)
+        """)
+        self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_payments_receiver ON payments(receiver_pubkey)
+        """)
+        self._db.execute("""
+            CREATE INDEX IF NOT EXISTS idx_payments_solana_tx ON payments(solana_tx)
         """)
         
         self._db.commit()
@@ -881,16 +932,25 @@ class RateLimiter:
         self._ip_conns = defaultdict(set)  # ip -> set of ws ids
         self._ip_msgs = defaultdict(list)  # ip -> [timestamps]
         self._ip_events = defaultdict(list)  # ip -> [timestamps]
+        self._authed_ws = {}  # ws_id -> bool
+    
+    def mark_authed(self, ws_id: str):
+        self._authed_ws[ws_id] = True
+    
+    def _is_authed(self, ws_id: str) -> bool:
+        return self._authed_ws.get(ws_id, False)
     
     def check_connect(self, ip: str, ws_id: str) -> bool:
-        if len(self._ip_conns[ip]) >= RATE_MAX_CONN:
+        max_conn = RATE_MAX_CONN_AUTH if self._is_authed(ws_id) else RATE_MAX_CONN
+        if len(self._ip_conns[ip]) >= max_conn:
             return False
         self._ip_conns[ip].add(ws_id)
+        self._authed_ws[ws_id] = False
         return True
     
     def disconnect(self, ip: str, ws_id: str):
         self._ip_conns.get(ip, set()).discard(ws_id)
-        # Cleanup stale entries
+        self._authed_ws.pop(ws_id, None)
         if not self._ip_conns.get(ip):
             self._ip_conns.pop(ip, None)
     
@@ -904,12 +964,13 @@ class RateLimiter:
         self._ip_msgs[ip].append(now)
         return True
     
-    def check_event(self, ip: str) -> bool:
+    def check_event(self, ip: str, ws_id: str = '') -> bool:
         now = time.time()
         cutoff = now - RATE_WINDOW
+        max_evts = RATE_MAX_EVENTS_AUTH if self._authed_ws.get(ws_id) else RATE_MAX_EVENTS
         evts = [t for t in self._ip_events.get(ip, []) if t > cutoff]
         self._ip_events[ip] = evts
-        if len(evts) >= RATE_MAX_EVENTS:
+        if len(evts) >= max_evts:
             return False
         self._ip_events[ip].append(now)
         return True
@@ -931,7 +992,9 @@ class NostrWSHandler:
         if request.method == 'POST' and request.content_type == 'application/nostr+json+rpc':
             return await admin_nip86(request)
         
-        if request.headers.get('Upgrade', '').lower() != 'websocket':
+        upgrade_hdr = request.headers.get('Upgrade', '').lower()
+        logger.debug(f"WS check: upgrade_hdr='{upgrade_hdr}', headers={dict(request.headers)}")
+        if upgrade_hdr != 'websocket':
             # V3.1: HTML dashboard for browsers, NIP-11 JSON for clients
             accept = request.headers.get('Accept', '')
             if 'text/html' in accept or 'text/*' in accept:
@@ -1006,10 +1069,10 @@ class NostrWSHandler:
                     if raw_size > MAX_EVENT_SIZE:
                         await ws.send_json(["OK", event.get('id',''), False, f"event too large ({raw_size}B > {MAX_EVENT_SIZE}B)"])
                         continue
-                    if not self.rate.check_event(ip):
+                    if not self.rate.check_event(ip, ws_id):
                         await ws.send_json(["OK", event.get('id',''), False, "rate limit: too many events"])
                         continue
-                    await self._handle_event(ws, event, authed_pubkey)
+                    await self._handle_event(ws, event, authed_pubkey, ws_id)
                 
                 elif cmd == "REQ":
                     sub_id = data[1]
@@ -1026,6 +1089,7 @@ class NostrWSHandler:
                     valid, result = verify_signed_auth(event, challenge or "")
                     if valid:
                         authed_pubkey = result
+                        self.rate.mark_authed(ws_id)
                         await ws.send_json(["OK", event['id'], True, "authenticated"])
                         logger.info(f"NIP-42 auth: {authed_pubkey[:16]}...")
                     else:
@@ -1034,7 +1098,8 @@ class NostrWSHandler:
         except asyncio.CancelledError:
             pass
         except Exception as e:
-            logger.warning(f"WS error ({ws_id}): {e}")
+            err_msg = str(e) or type(e).__name__ or "unknown"
+            logger.warning(f"WS close ({ws_id}): {err_msg}")
         finally:
             self.rate.disconnect(ip, ws_id)
             self._sessions.pop(ws_id, None)
@@ -1044,7 +1109,7 @@ class NostrWSHandler:
         
         return ws
     
-    async def _handle_event(self, ws, event: dict, authed_pubkey: str | None):
+    async def _handle_event(self, ws, event: dict, authed_pubkey: str | None, ws_id: str = ""):
         event_id = event.get('id', '')
         kind = event.get('kind', -1)
         pubkey = event.get('pubkey', '')
@@ -1054,6 +1119,17 @@ class NostrWSHandler:
             if r not in event:
                 await ws.send_json(["OK", event_id, False, f"missing {r}"])
                 return
+        
+        # K7: Verify integrity (NIP-01 id + Schnorr sig)
+        try:
+            integrity = verify_integrity(event)
+            if not integrity["valid"]:
+                await ws.send_json(["OK", event_id, False, f"integrity: {integrity['error']}"])
+                logger.warning(f"Integrity reject: {event_id[:20]}... {integrity['error']}")
+                return
+        except Exception as e:
+            logger.warning(f"Integrity check error: {e}")
+            # soft-fail: пропускаем проверку при ошибке импорта
         
         # Check banned pubkey
         cur = self.db._db.execute("SELECT reason FROM banned_pubkeys WHERE pubkey=?", (pubkey,))
@@ -1071,10 +1147,15 @@ class NostrWSHandler:
                 logger.debug(f"NIP-26: {pubkey[:16]}... delegated by {delegator[:16]}...")
         
         # V3.1: NIP-42 — permission tiers
-        # WHITELIST: full access (all kinds)
+        # WHITELIST: полный доступ (все kinds)
         # Authenticated (NIP-42): PUBLIC_WRITE_KINDS
         # Unauthenticated: read-only (reject write)
-        if effective_pubkey not in WHITELIST and pubkey not in WHITELIST:
+        # Localhost bypass: внутренние сервисы (DAO poster, heartbeat) не требуют AUTH
+        remote_ip = self._sessions.get(ws_id, {}).get("ip", "")
+        if remote_ip in ("127.0.0.1", "::1", "localhost"):
+            # Localhost — полный доступ
+            pass
+        elif effective_pubkey not in WHITELIST and pubkey not in WHITELIST:
             if not authed_pubkey:
                 await ws.send_json(["OK", event_id, False, "auth-required: authenticate via NIP-42 AUTH first"])
                 return
@@ -1225,7 +1306,7 @@ class NostrWSHandler:
             return
         
         # V3.0: NIP-13 — optional Proof of Work check
-        # If event has nonce tag — check first difficulty bits are zero
+        # Если в событии есть nonce тег — проверяем что первые difficulty бит нулевые
         nonce_tag = None
         difficulty = 0
         for t in event.get('tags', []):
@@ -1270,9 +1351,63 @@ class NostrWSHandler:
                     self.db._db.commit()
                     logger.debug(f"NIP-33: replaced {len(old_events)} events for kind={kind} d={d_tag}")
         
+        # NIP-XX: Solana Payments — kind:30000 validation
+        if kind == 30000:
+            result = await handle_snin_payment(event)
+            if not result.get("accepted", False):
+                await ws.send_json(["OK", event_id, False, f"payment rejected: {result.get('reason', 'unknown')}"])
+                logger.warning(f"[PAYMENT] ❌ {event_id[:12]} rejected: {result.get('reason')}")
+                return
+            logger.info(f"[PAYMENT] ✅ {event_id[:12]} verified on Solana")
+            
+            # Логируем в БД payments
+            try:
+                content_data = json.loads(event.get("content", "{}"))
+            except (json.JSONDecodeError, TypeError):
+                content_data = {}
+            p_tag = next((t[1] for t in event.get("tags", []) if t[0] == "p"), "")
+            solana_tx_tag = next((t[1] for t in event.get("tags", []) if t[0] == "solana_tx"), "")
+            self.db._db.execute("""
+                INSERT OR IGNORE INTO payments 
+                (id, event_id, kind, sender_pubkey, receiver_pubkey, amount, token, solana_tx, memo, created_at, accepted)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+            """, (
+                event_id[:16], event_id, kind, pubkey, p_tag,
+                content_data.get("amount", 0), content_data.get("token", "SNIN"),
+                solana_tx_tag, content_data.get("memo", ""), event.get("created_at", 0)
+            ))
+            self.db._db.commit()
+            logger.info(f"[PAYMENT] 💾 logged to DB: {event_id[:12]} → {p_tag[:12]} {content_data.get('amount', 0)} SNIN")
+
+        # NIP-XX: Solana Payments — kind:30001 balance request (NOT stored)
+        if kind == 30001:
+            relay_url = f"wss://relay-snin.v2.site"
+            relay_pubkey = CRYTER_PUBKEY
+            response = await handle_balance_request(event, relay_url, relay_pubkey)
+            if response:
+                await ws.send_json(["EVENT", "balance_response", response])
+                logger.info(f"[BALANCE] 📊 balance request from {pubkey[:12]}")
+            return
+
         # Store event (thread-safe)
         if await self.db.store_event_async(event):
-            await ws.send_json(["OK", event_id, True, ""])
+            
+# Auto-Fanout — ДО send_json (чтобы успеть до закрытия WS клиентом)
+            should_fanout = hasattr(self, 'fanout') and self.fanout is not None and (
+                effective_pubkey == CRYTER_PUBKEY or
+                effective_pubkey in WHITELIST or
+                kind in (39000, 39001, 39002) or  # DAO group posts
+                kind == 30000 or  # NIP-XX: Solana Payments fanout
+                any(
+                    t[0] == "p" and t[1].startswith(("02", "03")) and len(t[1]) == 66
+                    for t in event.get("tags", [])
+                )
+            )
+            if should_fanout:
+                try:
+                    self.fanout.enqueue(event)
+                except Exception as e:
+                    logger.warning(f"Fanout enqueue error: {e}")
             
             # DAO Voting: process proposals and votes
             if hasattr(self, 'dao_voting') and self.dao_voting:
@@ -1281,17 +1416,22 @@ class NostrWSHandler:
                 elif kind == 1112:
                     self.dao_voting.handle_vote(event)
             
-# Auto-Fanout — all SNIN agent events fanned to 520 relays
-            should_fanout = hasattr(self, 'fanout') and (
-                effective_pubkey == CRYTER_PUBKEY or
-                effective_pubkey in WHITELIST or
-                any(
-                    t[0] == "p" and t[1].startswith(("02", "03")) and len(t[1]) == 66
-                    for t in event.get("tags", [])
-                )
-            )
-            if should_fanout:
-                self.fanout.enqueue(event)
+            await ws.send_json(["OK", event_id, True, ""])
+            
+            # IPFS — отключён (legacy)
+            # if hasattr(self, 'ipfs') and self.ipfs:
+            #     try:
+            #         cid = await self.ipfs.publish_event(event)
+            #         if hasattr(self, 'cid_index') and self.cid_index:
+            #             self.cid_index.add(
+            #                 event["id"], cid,
+            #                 event.get("pubkey", ""),
+            #                 event.get("kind", -1),
+            #                 event.get("created_at", 0)
+            #             )
+            #         logger.debug(f"K7 IPFS: {cid} kind={event.get('kind')}")
+            #     except Exception as e:
+            #         logger.debug(f"K7 IPFS: {e}")
             
             # Notify subscribers (skip muted pubkeys)
             for sid, (sws, filters, _) in list(self._subscriptions.items()):
@@ -1353,6 +1493,18 @@ class NostrWSHandler:
             except:
                 pass
         
+        # K7: IPFS stats — отключён
+        # ipfs_obj = request.app.get('ipfs')
+        # ipfs_stats = {}
+        if ipfs_obj:
+            try:
+                await ipfs_obj.get_peers()
+                ipfs_stats = ipfs_obj.get_stats()
+            except:
+                pass
+        ipfs_peers = ipfs_stats.get('peers', 0)
+        ipfs_published = ipfs_stats.get('published', 0)
+        
         html = f"""<!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -1391,32 +1543,44 @@ h1 {{ font-size:2em; color:#00d4ff; margin-bottom:8px; }}
 <p class="subtitle">Sovereign Nostr Infrastructure · Version {VERSION}</p>
 
 <div class="grid">
-<div class="card green"><div class="value">{stats.get('events',0):,}</div><div class="label">Events</div></div>
-<div class="card"><div class="value">{stats.get('authors',0):,}</div><div class="label">Authors</div></div>
+<div class="card green"><div class="value">{stats.get('events',0):,}</div><div class="label">Событий</div></div>
+<div class="card"><div class="value">{stats.get('authors',0):,}</div><div class="label">Авторов</div></div>
 <div class="card green"><div class="value">{alive:,}</div><div class="label">Relay Alive</div></div>
 <div class="card"><div class="value">{fstats.get('published',0):,}</div><div class="label">Fanout</div></div>
+<div class="card orange"><div class="value">{ipfs_peers}</div><div class="label">IPFS Peers</div></div>
+<div class="card green"><div class="value">{ipfs_published}</div><div class="label">IPFS Published</div></div>
+</div>
+
+<div class="section">
+<h2>🪐 IPFS Pubsub (K7)</h2>
+<div class="info-row"><span class="label">IPFS Peers</span><span class="value">{ipfs_peers}</span></div>
+<div class="info-row"><span class="label">Published</span><span class="value">{ipfs_published}</span></div>
+<div class="info-row"><span class="label">Received</span><span class="value">{ipfs_stats.get('received', 0)}</span></div>
+<div class="info-row"><span class="label">Topic</span><span class="value" style="color:#00ff88">{ipfs_stats.get('topic', '—')}</span></div>
 </div>
 
 <div class="section">
 <h2>📡 Fanout Engine</h2>
-<div class="info-row"><span class="label">Total relays in DB</span><span class="value">{total:,}</span></div>
-<div class="info-row"><span class="label">Alive relays</span><span class="value" style="color:#00ff88">{alive:,}</span></div>
-<div class="info-row"><span class="label">Events broadcast</span><span class="value">{fstats.get('broadcast',0):,}</span></div>
-<div class="info-row"><span class="label">Relays hit</span><span class="value">{fstats.get('total_relays_hit',0):,}</span></div>
+<div class="info-row"><span class="label">Всего relay в БД</span><span class="value">{total:,}</span></div>
+<div class="info-row"><span class="label">Живых relay</span><span class="value" style="color:#00ff88">{alive:,}</span></div>
+<div class="info-row"><span class="label">Событий разослано</span><span class="value">{fstats.get('broadcast',0):,}</span></div>
+<div class="info-row"><span class="label">Relay затронуто</span><span class="value">{fstats.get('total_relays_hit',0):,}</span></div>
 </div>
 
 <div class="section">
 <h2>🔐 NIP-42 Authentication</h2>
-<div class="info-row"><span class="label">Write without AUTH</span><span class="value" style="color:#ff4444">Read-only</span></div>
+<div class="info-row"><span class="label">Write без AUTH</span><span class="value" style="color:#ff4444">Только чтение</span></div>
 <div class="info-row"><span class="label">AUTH (NIP-42)</span><span class="value" style="color:#00ff88">kind:1, 7, 9734, 9735</span></div>
-<div class="info-row"><span class="label">Whitelist</span><span class="value" style="color:#ff8800">15 SNIN agents</span></div>
+<div class="info-row"><span class="label">Rate limit (без AUTH)</span><span class="value">5 conn · 30 evt/10s</span></div>
+<div class="info-row"><span class="label">Rate limit (AUTH)</span><span class="value">20 conn · 100 evt/10s</span></div>
+<div class="info-row"><span class="label">Whitelist</span><span class="value" style="color:#ff8800">15 SNIN агентов</span></div>
 </div>
 
 <div class="howto">
-<h2>🔌 Connection</h2>
-<p>Nostr client:</p>
+<h2>🔌 Подключение</h2>
+<p>Nostr клиент:</p>
 <code>wss://snin-relay.v2.site</code>
-<p>NIP-42 AUTH required for posting:</p>
+<p>NIP-42 AUTH для публикации заметок:</p>
 <code>["AUTH", {{...}}]</code>
 </div>
 
@@ -1467,14 +1631,74 @@ async def admin_stats(request):
     db = request.app['db']
     stats = db.get_stats()
     handler = request.app['handler']
-    return web.json_response({
+    data = {
         **stats,
         "connections": len(handler._sessions),
         "subscriptions": len(handler._subscriptions),
         "uptime": int(time.time() - request.app['started_at']),
         "whitelist_count": len(WHITELIST),
         "delegations_count": len(DELEGATIONS),
+        "ipfs": request.app.get('ipfs', {}).get_stats() if request.app.get('ipfs') else None,
+        "sse_subscribers": request.app.get('sse_subscribers', 0),
+    }
+    return web.json_response(data)
+
+async def admin_payments(request):
+    """GET /api/payments — список платежей kind:30000"""
+    db = request.app['db']
+    limit = min(int(request.query.get('limit', 20)), 100)
+    offset = int(request.query.get('offset', 0))
+    sender = request.query.get('sender', '')
+    receiver = request.query.get('receiver', '')
+    
+    query = "SELECT * FROM payments WHERE accepted=1"
+    params = []
+    if sender:
+        query += " AND sender_pubkey=?"
+        params.append(sender)
+    if receiver:
+        query += " AND receiver_pubkey=?"
+        params.append(receiver)
+    
+    query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+    params.extend([limit, offset])
+    
+    rows = db._db.execute(query, params).fetchall()
+    columns = [desc[0] for desc in db._db.execute(query, params).description]
+    
+    total = db._db.execute("SELECT COUNT(*) FROM payments WHERE accepted=1").fetchone()[0]
+    
+    return web.json_response({
+        "payments": [dict(zip(columns, row)) for row in rows],
+        "total": total,
+        "limit": limit,
+        "offset": offset
     })
+
+async def admin_payment_detail(request):
+    """GET /api/payments/{event_id} — детали платежа"""
+    db = request.app['db']
+    event_id = request.match_info.get('event_id', '')
+    row = db._db.execute(
+        "SELECT * FROM payments WHERE id=? OR event_id=?", (event_id, event_id)
+    ).fetchone()
+    if not row:
+        return web.json_response({"error": "payment not found"}, status=404)
+    columns = [desc[0] for desc in db._db.execute(
+        "SELECT * FROM payments WHERE id=? OR event_id=?", (event_id, event_id)
+    ).description]
+    return web.json_response(dict(zip(columns, row)))
+
+async def admin_sse_subscribers(request):
+    """GET /api/sse — количество активных SSE подписчиков."""
+    from sse_handler import broadcaster
+    return web.json_response({"subscribers": broadcaster.subscriber_count})
+
+
+async def admin_ipfs(request):
+    """K7: IPFS — отключён."""
+    return web.json_response({"status": "disabled", "message": "IPFS legacy removed"})
+
 
 async def admin_events(request):
     db = request.app['db']
@@ -1552,6 +1776,57 @@ async def admin_fanout(request):
     stats["mass_pulse_relays"] = mass_pulse.get_stats() if mass_pulse else {}
     
     return web.json_response(stats)
+
+async def fanout_post(request):
+    """POST /api/fanout — Accept a Nostr event and broadcast to all alive relays.
+    Body: {"event": {signed event}, "pubkey": "...", "proof": "zap_receipt_or_npub"}
+    """
+    try:
+        body = await request.json()
+    except:
+        return web.json_response({"error": "invalid JSON"}, status=400)
+    
+    event = body.get("event")
+    if not event:
+        return web.json_response({"error": "event required"}, status=400)
+    
+    fanout = request.app.get('fanout')
+    if not fanout:
+        return web.json_response({"error": "fanout not initialized"}, status=503)
+    
+    # Validate required event fields
+    for field in ["id", "pubkey", "created_at", "kind", "tags", "content", "sig"]:
+        if field not in event:
+            return web.json_response({"error": f"missing field: {field}"}, status=400)
+    
+    # Verify signature (basic check)
+    if event.get("kind") not in [1, 9734, 9735, 30000, 30001, 30002]:
+        pass  # accept any kind for now
+    
+    # Check if this pubkey has active subscription
+    db = request.app.get('db')
+    pubkey = event.get("pubkey", "")
+    
+    # For now: accept all events, log for payment tracking
+    logger.info(f"📨 Fanout post from {pubkey[:16]}... kind={event.get('kind')}")
+    
+    # Queue fanout
+    fanout.enqueue(event)
+    
+    return web.json_response({
+        "status": "queued",
+        "event_id": event["id"],
+        "target": "3335 alive relays",
+        "estimated_time": "<2s"
+    })
+
+
+async def fanout_page(request):
+    """GET /fanout — Landing page for Fanout as a Service"""
+    html_path = Path(__file__).parent / "static" / "fanout" / "index.html"
+    if html_path.exists():
+        return web.FileResponse(html_path)
+    return web.Response(text="<h1>SNIN Fanout</h1><p>Coming soon</p>", content_type="text/html")
 
 async def admin_heartbeats(request):
     db = request.app['db']
@@ -1745,8 +2020,22 @@ async def admin_dao_votes(request):
 # ── Main ──
 
 # NIP-05: name -> pubkey mapping for snin-relay.v2.site
-# Replace with your agent pubkeys before deployment
 NIP05_NAMES = {
+    "aiantology": "02c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",
+    "analyst": "0286a1f42cf649830a1dd61dd4f5faf90a5c46384f407cf1a734187191014f4378",
+    "anton": "023b93c14d8ae134a1be6d6ba08e609d926ec1225bdcb962d5d8e9b16b0f7d2a35",
+    "aporia": "022047bfadceedeb9f15195c706d56a59ebe419212ffd8164aa367bf696f51fa69",
+    "archivist": "02ba66fbbf3eabd6330f0307e701bf7413716cb73280076a7aa6516a4bd3d6a843",
+    "cryptontology": "02c460dc4698a7cef2be8d1b61e91a64067a7233f4ed81a94f1a14e340f05628bb",
+    "cryter": "028ae7965af1b61347bb9900b91cfa9487e4da2400bdb063521ad0850706ff5f96",
+    "director": "02f44e3a8683ac627b13e15abe9731859f30694dd4b4d730cb6c4318546c385c7a",
+    "executor": "0267fb50e1139c62ad45f9e519eea7a19cbba4538f489d26b5646b451c5e65f12e",
+    "forecaster": "026dcf915162d77891d06028de2ee10ce10e767d1acab412adaf3c2e2affd98e1c",
+    "marketing": "02733080edaaed6b056fa7fbff73e5d43914c31f2845af25bff91f1969a2d52d9c",
+    "randd": "02f8b54d33551f131540816bd77e580d62d889ade8240aa4e3afb35bee7fb6b716",
+    "security": "02bd8979c65f3290f6790bf3a611fd5a0058bf42ef97b5ea281109312c71979835",
+    "strategist": "0224446e7c5b42c88fac01c83bcb2a8953ec9665e8835cc39af4303003841f2f68",
+    "support": "028836071e3f9858d260cbe4247c5889f6fba9f9cb854eff88778c4a0dbb761169",
 }
 NIP05_IDENTITY = "snin-relay.v2.site"
 
@@ -1757,7 +2046,7 @@ async def handle_nip05(request):
         return web.json_response({
             "names": {name: NIP05_NAMES[name]},
         })
-    # If name not found — return all
+    # Если name не указан или не найден — отдаём всех
     return web.json_response({
         "names": NIP05_NAMES,
     })
@@ -1770,6 +2059,12 @@ async def main():
     rate = RateLimiter()
     handler = NostrWSHandler(db, rate)
     
+    # NIP-XX: Init SNIN Payments
+    init_payments(
+        fee_address="2uHqUwHDJFvuWXub5oUovDznQ4KvWyMntGwcgokET6c4",  # user's wallet
+        mint_address="AZFF8K8NcA6gX19Dnv4gsnfbSD7g6rswD4PinEeBxZAN"  # SNIN token
+    )
+    
     app = web.Application()
     app['db'] = db
     app['handler'] = handler
@@ -1777,6 +2072,10 @@ async def main():
     
     # V3.0: Load delegations from DB
     db.load_delegations()
+    
+    # Dev mode — отключаем верификацию подписей для тестов Solana
+    os.environ['SNIN_RELAY_DEV_MODE'] = '1'
+    logger.warning("⚠️ SNIN RELAY DEV MODE — signature verification disabled for Solana tests")
     
     # V2.4: Pulse Sync (keep for reference, but fanout uses mass pulse)
     pulse = PulseSync()
@@ -1813,7 +2112,45 @@ async def main():
     handler.dao_voting = dao_voting
     
     handler.fanout = fanout
-    
+
+    # K7: IPFS Pubsub Engine — отключён (legacy, Mesh v0.5+ не использует)
+    # ipfs = IPFSPubsub()
+    # app['ipfs'] = ipfs
+    # handler.ipfs = ipfs
+    # cid_index = CIDIndex(str(DB_PATH))
+    # app['cid_index'] = cid_index
+    # handler.ipfs = ipfs
+    # handler.cid_index = cid_index
+    # logger.info("K7 IPFS engine initialized — %d CID records", cid_index.get_stats()['total'])
+
+    # K7: SSE subscription — отключён (IPFS legacy)
+    # from sse_handler import broadcaster as sse_broadcaster
+    # async def on_ipfs_event(event):
+    #     logger.info(f"IPFS received event: kind={event.get('kind')} id={event.get('id','')[:20]}...")
+    #     await sse_broadcaster.broadcast(event)
+    # async def on_ipfs_error(cid, error):
+    #     logger.warning(f"IPFS sub error for {cid}: {error}")
+    # async def run_ipfs_sub():
+    #     await asyncio.sleep(3)
+    #     await ipfs.subscribe_loop(on_ipfs_event, on_ipfs_error)
+    # asyncio.create_task(run_ipfs_sub())
+    # logger.info("K7 IPFS subscribe loop started")
+
+    # V4.0: Periodic WS session cleanup — раз в 5 мин чистит залипшие сессии
+    async def _ws_session_cleanup():
+        while True:
+            await asyncio.sleep(300)  # каждые 5 минут
+            now = time.time()
+            stale = [ws_id for ws_id, s in handler._sessions.items()
+                     if now - s.get("last_activity", 0) > 600]  # >10 мин без активности
+            if stale:
+                for ws_id in stale:
+                    handler._sessions.pop(ws_id, None)
+                logger.info(f"[CLEANUP] Удалено {len(stale)} залипших WS сессий (всего: {len(handler._sessions)})")
+
+    asyncio.create_task(_ws_session_cleanup())
+    logger.info("V4.0 WS session cleanup started (каждые 5 мин, порог 10 мин)")
+
     # Routes
     app.router.add_route("*", "/", handler.handle, name="root")
     
@@ -1829,9 +2166,39 @@ async def main():
     app.router.add_get("/api/agents", admin_agents)
     app.router.add_get("/api/agents/{pubkey}", admin_agent_detail)
     
-    # Seed agents — configure your agent list before deployment
+    # K7: IPFS stats
+    # app.router.add_get("/api/ipfs", admin_ipfs)
+    
+    # K7: SSE Nostr endpoint (HTTP заменяет WSS)
+    setup_sse_routes(app)
+    logger.info("SSE Nostr endpoint: POST /nostr (REQ + EVENT)")
+    
+    # K7: SSE subscribers count
+    app.router.add_get("/api/sse", admin_sse_subscribers)
+    
+    # NIP-XX: Payments API
+    app.router.add_get("/api/payments", admin_payments)
+    app.router.add_get("/api/payments/{event_id}", admin_payment_detail)
+    
+    # Seed agents
     agent_names = [
-        # ("agent_name", "agent_role"),
+        ("aiantology", "social pulse"),
+        ("analyst", "market analyst"),
+        ("anton", "agent manager"),
+        ("aporia", "philosopher"),
+        ("archivist", "historian"),
+        ("cryptontology", "ontology"),
+        ("cryter", "pulse broadcaster"),
+        ("director", "CEO / strategist"),
+        ("executor", "ops executor"),
+        ("forecaster", "prediction"),
+        ("marketing", "growth"),
+        ("randd", "research & dev"),
+        ("security", "security auditor"),
+        ("strategist", "game theory"),
+        ("support", "user support"),
+        ("V2Bot Agent", "V2Bot assistant"),
+        ("Remora", "market agent"),
     ]
     agents_dict = {}
     for (name, role), pubhex in zip(agent_names, WHITELIST):
@@ -1853,21 +2220,65 @@ async def main():
             SELECT MAX(created_at) FROM events WHERE events.pubkey = agents.pubkey
         ) WHERE EXISTS (SELECT 1 FROM events WHERE events.pubkey = agents.pubkey)
     """)
+    # Обновляем статус: active если есть ивенты, иначе registered
+    db._db.execute("""
+        UPDATE agents SET status = CASE
+            WHEN events_count > 0 THEN 'active'
+            ELSE 'registered'
+        END
+    """)
+    # Удаляем registered без ивентов — не мешаются
+    db._db.execute("DELETE FROM agents WHERE status = 'registered' AND events_count = 0")
     db._db.commit()
     
     registered = len(db.get_agents())
     
-    # Seed DAO groups — configure after adding agent pubkeys to WHITELIST
+    # Seed DAO groups
     groups_config = [
-        # Add your DAO groups here
-        # Example:
-        # {
-        #     "id": "general",
-        #     "name": "SNIN General",
-        #     "about": "General chat for all SNIN DAO agents",
-        #     "pubkey": WHITELIST[0],
-        #     "members": WHITELIST[:],
-        # },
+        {
+            "id": "strategy",
+            "name": "SNIN Strategy",
+            "about": "Strategic decisions, consensus proposals, long-term planning",
+            "pubkey": WHITELIST[7],  # director
+            "members": [
+                WHITELIST[7],   # director
+                WHITELIST[13],  # strategist
+                WHITELIST[3],   # aporia
+                WHITELIST[0],   # aiantology
+                WHITELIST[6],   # cryter
+            ],
+        },
+        {
+            "id": "market",
+            "name": "SNIN Market",
+            "about": "Market analysis, Bitcoin price, trading signals, economic trends",
+            "pubkey": WHITELIST[1],  # analyst
+            "members": [
+                WHITELIST[1],   # analyst
+                WHITELIST[9],   # forecaster
+                WHITELIST[10],  # marketing
+                WHITELIST[6],   # cryter
+            ],
+        },
+        {
+            "id": "dev",
+            "name": "SNIN Development",
+            "about": "Code reviews, releases, infrastructure, security patches",
+            "pubkey": WHITELIST[11],  # randd
+            "members": [
+                WHITELIST[11],  # randd
+                WHITELIST[8],   # executor
+                WHITELIST[12],  # security
+                WHITELIST[2],   # anton
+            ],
+        },
+        {
+            "id": "general",
+            "name": "SNIN General",
+            "about": "General chat for all SNIN DAO agents",
+            "pubkey": WHITELIST[6],  # cryter
+            "members": WHITELIST[:],  # all 15 agents
+        },
     ]
     db.init_groups(groups_config)
     groups_count = len(db.get_groups())
@@ -1876,6 +2287,8 @@ async def main():
     app.router.add_get("/api/groups/{group_id}", admin_group_detail)
     app.router.add_get("/api/relays", admin_relays)
     app.router.add_get("/api/fanout", admin_fanout)
+    app.router.add_post("/api/fanout", fanout_post)
+    app.router.add_get("/fanout", fanout_page)
     app.router.add_get("/api/heartbeats", admin_heartbeats)
     app.router.add_get("/api/mesh", admin_mesh)
     

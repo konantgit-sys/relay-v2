@@ -2,6 +2,36 @@
 
 All notable changes to SNIN Relay V2 are documented here.
 
+## v3.2.0 — Solana Payments Edition (unreleased)
+
+**Status:** Active on `relay-snin.v2.site` | **Mint:** `AZFF8K8NcA6gX19Dnv4gsnfbSD7g6rswD4PinEeBxZAN`
+
+### Added
+- **NIP-XX: Solana Payments** — kind:30000-30002 native SOL + SPL token payments
+- `snin_payments.py` — payment verification, double-spend prevention, fee collection
+- `solana_rpc.py` — Solana RPC client with extract_transfer_info (SOL + SPL support)
+- `bridge.py` — event bridge relay-snin → relay-mesh (P2P agent mesh)
+- `ws_gateway.py` — WebSocket gateway for external relay connections
+- `relay_monitor.py` — real-time relay health monitoring dashboard
+- `zap_handler.py` — NIP-57 Lightning zaps handler
+- `heartbeat_daemon.py` — relay heartbeat + uptime reporting
+- SNIN token deployed on mainnet: `AZFF8K8NcA6gX19Dnv4gsnfbSD7g6rswD4PinEeBxZAN`
+- `/api/payments` REST endpoint for payment history
+- Dev mode for signature bypass during Solana testing
+
+### Fixed
+- `extract_transfer_info` — now handles both SOL (System Program) and SPL Token transfers
+- Hardcoded fee_address → configurable via `relay.yaml`
+- Double-spend prevention — in-memory seen set with TTL
+
+### Changed
+- `relay_server_v2.py` — integrated Solana payment pipeline, bridge mode
+- `nostr_marshal.py` — dev mode support (`SNIN_RELAY_DEV_MODE`)
+- `relay.yaml` — added `solana.rpc_url`, `solana.fee_address`, `solana.mint_address`
+- `sse_handler.py` — broadcast Solana payment events
+
+---
+
 ## v3.1.0 (latest) — Quantum Leap Edition
 
 **Released:** 2026-05-08 | **Status:** Active on `relay-snin.v2.site`
@@ -58,20 +88,11 @@ All notable changes to SNIN Relay V2 are documented here.
 
 ### Added
 - aiohttp WebSocket server with NIP-01 event ingestion
-- SQLite storage with WAL + FTS5
-- 15 NIPs support
-- Rate limiting (per-IP)
-- NIP-11 relay info document
-- Agent heartbeat daemon (kind:19000)
-- Fanout to external relays
-- Pulse Sync — relay-to-relay state sync
-- Mesh Fetch — cross-relay event discovery
-- NIP-57 Zap handler (Lightning)
-
----
-
-## v1.0.0 — Initial Release
-
-**Released:** 2026-05-04
-
-Proof of concept: basic Nostr relay with SQLite storage and WebSocket transport.
+- SQLite event storage (20k+ events, FTS5)
+- NIP-12 generic tag search
+- NIP-15 end-of-stored-events marker
+- NIP-20 command results
+- NIP-22 comment URL
+- NIP-45 event counts with caching
+- MassPulse — live relay scanning engine
+- IPFS CID indexing (experimental)

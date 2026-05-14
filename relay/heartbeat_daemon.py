@@ -27,7 +27,7 @@ logging.basicConfig(
 logger = logging.getLogger('heartbeat')
 
 # ── Config ──
-AGENTS_REGISTRY = os.getenv("AGENTS_REGISTRY_DIR", "/etc/snin-relay/agents_registry")
+AGENTS_REGISTRY = "/home/agent/data/agents_registry"
 RELAY_WS = "ws://127.0.0.1:8198"  # local connection
 RELAY_API = "http://127.0.0.1:8198"
 HEARTBEAT_INTERVAL = 600  # 10 minutes
@@ -82,34 +82,32 @@ async def publish_event(event_dict: dict) -> bool:
 
 
 def load_valid_agents() -> list[dict]:
-    """Load agents from environment variables.
+    """Load agents with valid nsec keys only."""
+    from nostr_protocol import Keys
     
-    Set env vars like:
-      AGENT_KEY_cryter=nsec1...
-      AGENT_KEY_support=nsec1...
-      AGENT_NAME_cryter=Cryter
-    """
     agents = []
-    for env_name, env_val in sorted(os.environ.items()):
-        if not env_name.startswith("AGENT_KEY_"):
-            continue
-        agent_name = env_name.replace("AGENT_KEY_", "").lower()
-        nsec = env_val
-        if not nsec.startswith("nsec"):
+    for dirname in sorted(os.listdir(AGENTS_REGISTRY)):
+        keys_path = os.path.join(AGENTS_REGISTRY, dirname, "keys.json")
+        if not os.path.exists(keys_path):
             continue
         try:
+            with open(keys_path) as f:
+                keys = json.load(f)
+            nsec = keys.get("nsec", "")
+            if not nsec or not nsec.startswith("nsec"):
+                continue
             k = Keys.parse(nsec)
             pubhex = k.public_key().to_hex()
-            display_name = os.environ.get(f"AGENT_NAME_{agent_name}", agent_name)
             agents.append({
-                "name": display_name,
+                "dir": dirname,
+                "name": AGENT_NAMES.get(dirname, dirname),
                 "nsec": nsec,
                 "pubhex": pubhex,
             })
         except Exception as e:
-            logger.debug(f"Skipping {agent_name}: {e}")
+            logger.debug(f"Skipping {dirname}: {e}")
     
-    logger.info(f"Loaded {len(agents)} valid agents from env")
+    logger.info(f"Loaded {len(agents)} valid agents from registry")
     return agents
 
 

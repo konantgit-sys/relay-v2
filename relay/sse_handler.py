@@ -1,10 +1,10 @@
 """
-SNIN Relay — SSE Handler
+SNIN Relay — SSE Handler (K7 / День 5)
 
-HTTP/SSE endpoint for Nostr-compatible protocol.
-Alternative to WSS: passes through any ingress, no Upgrade required.
+HTTP/SSE endpoint для Nostr-совместимого протокола.
+Замена WSS: проходит через любой ingress, не требует Upgrade.
 
-Protocol:
+Протокол:
   POST /nostr  {"method":"REQ","params":["sub1",{filters}]}
     → SSE stream: data: ["EVENT","sub1",{...}]
                    data: ["EOSE","sub1"]
@@ -31,19 +31,19 @@ from aiohttp import web
 
 logger = logging.getLogger("sse_handler")
 
-# ── Constants ──────────────────────────────────────────────
-SSE_KEEPALIVE_INTERVAL = 30  # ping every 30 seconds
+# ── Константы ──────────────────────────────────────────────
+SSE_KEEPALIVE_INTERVAL = 30  # ping каждые 30 секунд
 SSE_FRAME = 'data: {}\n\n'
-MAX_FILTER_EVENTS = 500  # max events per REQ response
+MAX_FILTER_EVENTS = 500  # макс событий в ответ на REQ
 
 
 # ── SSE Broadcaster (live stream из IPFS pubsub) ────────────
 
 class SSEBroadcaster:
-    """Global registry of active SSE subscriptions.
+    """Глобальный реестр активных SSE подписок.
 
-    Allows broadcasting events from IPFS pubsub to all active
-    SSE clients in real time.
+    Позволяет рассылать события из IPFS pubsub всем активным
+    SSE-клиентам в реальном времени.
     """
 
     def __init__(self):
@@ -51,19 +51,19 @@ class SSEBroadcaster:
         self._lock = asyncio.Lock()
 
     async def subscribe(self, sub_id: str) -> asyncio.Queue:
-        """Create a queue for subscriber. Returns Queue."""
+        """Создать очередь для подписчика. Возвращает Queue."""
         q: asyncio.Queue = asyncio.Queue()
         async with self._lock:
             self._queues[sub_id] = q
         return q
 
     async def unsubscribe(self, sub_id: str):
-        """Remove a subscriber."""
+        """Удалить подписчика."""
         async with self._lock:
             self._queues.pop(sub_id, None)
 
     async def broadcast(self, event: dict):
-        """Broadcast event to all active subscribers."""
+        """Разослать событие всем активным подписчикам."""
         async with self._lock:
             dead = []
             for sub_id, q in self._queues.items():
@@ -79,7 +79,7 @@ class SSEBroadcaster:
         return len(self._queues)
 
 
-# Global instance
+# Глобальный экземпляр
 broadcaster = SSEBroadcaster()
 
 
@@ -94,7 +94,7 @@ CORS_HEADERS = {
 
 
 def add_cors(response: web.StreamResponse | web.Response):
-    """Add CORS headers to response."""
+    """Добавляет CORS заголовки к ответу."""
     for k, v in CORS_HEADERS.items():
         response.headers[k] = v
 
@@ -102,7 +102,7 @@ def add_cors(response: web.StreamResponse | web.Response):
 # ── SSE Response ───────────────────────────────────────────
 
 async def sse_response(request) -> web.StreamResponse:
-    """Create SSE response with CORS and buffering disabled."""
+    """Создаёт SSE response с CORS и отключением буферизации."""
     resp = web.StreamResponse(
         status=200,
         reason="OK",
@@ -119,14 +119,14 @@ async def sse_response(request) -> web.StreamResponse:
 
 
 async def sse_send(resp: web.StreamResponse, data: list):
-    """Send SSE frame: data: [...]\n\n"""
+    """Отправляет SSE фрейм: data: [...]\n\n"""
     payload = SSE_FRAME.format(json.dumps(data, separators=(",", ":"), ensure_ascii=False))
     await resp.write(payload.encode())
     await resp.drain()
 
 
 async def sse_keepalive(resp: web.StreamResponse, stop_event: asyncio.Event):
-    """Background keepalive: :ping every 30 seconds."""
+    """Фоновый keepalive: :ping каждые 30 секунд."""
     while not stop_event.is_set():
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=SSE_KEEPALIVE_INTERVAL)
@@ -164,7 +164,7 @@ def build_sse_query(filters: dict) -> tuple[str, list]:
     # authors
     if "authors" in filters and filters["authors"]:
         authors = filters["authors"]
-        # Support 02/03 prefixes
+        # Поддержка префиксов 02/03
         expanded = []
         for a in authors:
             expanded.append(a)
@@ -172,7 +172,7 @@ def build_sse_query(filters: dict) -> tuple[str, list]:
                 expanded.append("02" + a)
                 expanded.append("03" + a)
             elif len(a) == 66:
-                expanded.append(a[2:])  # without prefix
+                expanded.append(a[2:])  # без префикса
         if len(expanded) == 1:
             conditions.append("pubkey=?")
             params.append(expanded[0])
@@ -212,18 +212,18 @@ def build_sse_query(filters: dict) -> tuple[str, list]:
 
 
 async def query_events_sse(db, filters: dict) -> list[dict]:
-    """Execute DB query by Nostr filters.
+    """Выполняет запрос к БД по фильтрам Nostr.
 
     Returns:
-        List of events (dict)
+        Список событий (dict)
     """
     where, params, limit = build_sse_query(filters)
 
-    # Determine sort direction
+    # Определяем направление сортировки
     if filters.get("until"):
-        order = "DESC"  # newest to oldest
+        order = "DESC"  # от новых к старым
     else:
-        order = "DESC"  # default newest first
+        order = "DESC"  # по умолчанию от новых
 
     sql = (
         f"SELECT id, pubkey, created_at, kind, tags_json, content, sig "
@@ -260,16 +260,16 @@ async def handle_req(
     ipfs=None,
     cid_index=None,
 ):
-    """REQ: SSE stream with events + EOSE + live events from IPFS pubsub."""
+    """REQ: SSE поток с событиями + EOSE + новые события из IPFS pubsub (live)."""
     resp = await sse_response(request)
     stop_event = asyncio.Event()
     keepalive_task = asyncio.create_task(sse_keepalive(resp, stop_event))
 
-    # Subscribe to live stream from IPFS pubsub
+    # Подписываемся на live stream из IPFS pubsub
     live_queue = await broadcaster.subscribe(f"req:{sub_id}")
 
     try:
-        # 1. Send historical events
+        # 1. Отправляем исторические события
         events = await query_events_sse(db, filters)
         for event in events:
             await sse_send(resp, ["EVENT", sub_id, event])
@@ -282,20 +282,20 @@ async def handle_req(
         # 2. EOSE
         await sse_send(resp, ["EOSE", sub_id])
 
-        # 3. Live stream — await new events from IPFS pubsub
+        # 3. Live stream — ждём новые события из IPFS pubsub
         logger.debug(f"SSE REQ {sub_id}: entering live mode ({broadcaster.subscriber_count} active)")
         while True:
             try:
-                # Wait for new event or keepalive
+                # Ждём новое событие или keepalive
                 event = await asyncio.wait_for(
                     live_queue.get(),
                     timeout=SSE_KEEPALIVE_INTERVAL,
                 )
-                # Check if matches filter (rough check)
+                # Проверяем, подходит ли под фильтр (грубая проверка)
                 if _matches_filter(event, filters):
                     await sse_send(resp, ["EVENT", sub_id, event])
             except asyncio.TimeoutError:
-                # keepalive already sent by sse_keepalive task
+                # keepalive уже отправляется sse_keepalive task
                 pass
 
     except (ConnectionResetError, ConnectionAbortedError, Exception) as e:
@@ -313,7 +313,7 @@ async def handle_req(
 
 
 def _matches_filter(event: dict, filters: dict) -> bool:
-    """Rough event-to-filter match (for live stream)."""
+    """Грубая проверка события под фильтр (для live stream)."""
     if not filters:
         return True
     kinds = filters.get("kinds")
@@ -336,8 +336,8 @@ async def handle_event(
     ipfs=None,
     cid_index=None,
 ):
-    """EVENT: publish event to relay + IPFS."""
-    # Validate via nostr_marshal
+    """EVENT: публикация события в relay + IPFS."""
+    # Проверка через nostr_marshal
     try:
         from nostr_marshal import verify_integrity, marshal_event
 
@@ -348,18 +348,18 @@ async def handle_event(
                 status=400,
             )
     except ImportError:
-        pass  # nostr_marshal may be unavailable
+        pass  # nostr_marshal может быть недоступен
 
     event_id = event.get("id", "")
 
-    # Save to relay DB
+    # Сохраняем в БД relay
     try:
-        # store_event_async takes event dict, not separate fields
+        # store_event_async принимает event dict, а не отдельные поля
         await db.store_event_async(event)
     except Exception as e:
         logger.warning(f"SSE EVENT: DB store failed: {e}")
 
-    # Publish to IPFS
+    # Публикуем в IPFS
     cid = None
     if ipfs:
         try:
@@ -375,7 +375,7 @@ async def handle_event(
         except Exception as e:
             logger.warning(f"SSE EVENT: CID index add failed: {e}")
 
-    # Fanout fallback (if IPFS failed)
+    # Fanout fallback (если IPFS не сработал)
     if not cid:
         fanout = request.app.get("fanout")
         if fanout:
@@ -397,7 +397,7 @@ async def handle_event(
 # ── Main Nostr Endpoint ────────────────────────────────────
 
 async def handle_nostr(request: web.Request):
-    """POST /nostr — universal handler for REQ and EVENT.
+    """POST /nostr — универсальный обработчик REQ и EVENT.
 
     REQ: {"method":"REQ","params":["sub1",{filters}]} → SSE
     EVENT: {"method":"EVENT","params":[{event}]} → {"status":"ok","cid":"..."}
@@ -420,12 +420,25 @@ async def handle_nostr(request: web.Request):
     except (json.JSONDecodeError, ValueError) as e:
         return web.json_response({"status": "error", "message": f"invalid JSON: {e}"}, status=400)
 
-    method = body.get("method")
-    params = body.get("params", [])
+    try:
+        # Nostr массив: ["REQ", "sub1", {"limit":1}] или JSON-RPC: {"method":"REQ","params":[...]}
+        if isinstance(body, list):
+            if len(body) < 1:
+                return web.json_response({"status": "error", "message": "empty array"}, status=400)
+            method = body[0]
+            params = body[1:] if len(body) > 1 else []
+        else:
+            method = body.get("method")
+            params = body.get("params", [])
 
-    if not method or method not in ("REQ", "EVENT", "AUTH"):
+        if not method or method not in ("REQ", "EVENT", "AUTH"):
+            return web.json_response(
+                {"status": "error", "message": "method must be REQ, EVENT, or AUTH"},
+                status=400,
+            )
+    except Exception as e:
         return web.json_response(
-            {"status": "error", "message": "method must be REQ, EVENT, or AUTH"},
+            {"status": "error", "message": f"parse error: {e}"},
             status=400,
         )
 
@@ -563,14 +576,14 @@ async def handle_auth(request: web.Request, params: list, db) -> web.Response:
         )
 
 def setup_sse_routes(app: web.Application):
-    """Attach SSE routes to aiohttp application."""
+    """Подключает SSE маршруты к aiohttp приложению."""
     app.router.add_route("*", "/nostr", handle_nostr, name="nostr")
 
 
 # ── Self-test ──────────────────────────────────────────────
 
 def test_build_query():
-    """Test SQL query building."""
+    """Тест построения SQL запроса."""
     tests = [
         (
             {"kinds": [1], "authors": ["a1b2c3d4"], "limit": 50},
@@ -596,7 +609,7 @@ def test_build_query():
     for i, (filters, expected) in enumerate(tests):
         try:
             where, params, limit = build_sse_query(filters)
-            # Check structure (exact SQL may differ)
+            # Проверяем структуру (точный SQL может отличаться)
             assert isinstance(where, str) and len(where) > 0
             assert isinstance(params, list)
             assert isinstance(limit, int) and limit > 0
@@ -610,7 +623,7 @@ def test_build_query():
 
 
 def test():
-    """Run all SSE Handler tests."""
+    """Прогон всех тестов SSE Handler."""
     print("SSE Handler tests:")
     total_passed = 0
     total_failed = 0

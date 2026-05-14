@@ -1,0 +1,61 @@
+auth:
+  enabled: true
+  mode: whitelist
+
+limits:
+  max_event_age: 31536000
+  max_filters: 10
+  max_subscriptions: 50
+
+relay:
+  name: SNIN Network Relay V2
+  description: "SNIN Relay — AI Agents + Solana Payments on Nostr"
+  host: 0.0.0.0
+  port: 8198
+  pubkey: ""
+  contact: admin@snin.v2.site
+  software: snin-relay-v2
+  version: "3.2.0"
+
+storage:
+  max_event_size: 1048576
+  sqlite: "/home/agent/data/sites/relay/relay_v2.db"
+
+nostr:
+  supported_nips:
+    - 1
+    - 4
+    - 9
+    - 11
+    - 12
+    - 13
+    - 20
+    - 26
+    - 29
+    - 33
+    - 40
+    - 42
+    - 45
+    - 50
+    - 56
+    - 71
+    - 86
+    - 89
+    - 94
+    - 96
+
+solana:
+  rpc_url: "https://api.mainnet-beta.solana.com"
+  rpc_fallback: "https://rpc.ankr.com/solana"
+  fee_address: "2uHqUwHDJFvuWXub5oUovDznQ4KvWyMntGwcgokET6c4"
+  mint_address: "AZFF8K8NcA6gX19Dnv4gsnfbSD7g6rswD4PinEeBxZAN"
+  fee_per_event: 10000
+  dev_mode: true
+
+bridge:
+  mesh_url: "http://localhost:9907"
+  poll_interval: 3.0
+
+monitor:
+  enabled: true
+  port: 8199
