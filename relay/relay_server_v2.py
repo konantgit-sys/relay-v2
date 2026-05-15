@@ -64,7 +64,7 @@ from sse_handler import setup_sse_routes
 from snin_payments import handle_snin_payment, handle_balance_request, init_payments, get_seen_tx_count
 
 # ── Config ──
-BASE = Path("/home/agent/data/sites/relay")
+BASE = Path(os.getenv("RELAY_BASE", str(Path(__file__).parent)))
 DB_PATH = BASE / "relay_v2.db"
 HOST, PORT = "0.0.0.0", 8198  # V2 on new port
 VERSION = "3.1.0"
