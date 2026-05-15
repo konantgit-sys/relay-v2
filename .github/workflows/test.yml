@@ -29,9 +29,15 @@ jobs:
 
       - name: Start relay for tests
         run: |
-          python relay/relay_server_v2.py &
-          sleep 3
-          echo "✅ Relay ready on :8198"
+          mkdir -p relay/blobs
+          RELAY_BASE=$(pwd)/relay python -u relay/relay_server_v2.py > relay/server.log 2>&1 &
+          for i in $(seq 1 10); do
+            if curl -s http://localhost:8198 >/dev/null 2>&1; then
+              echo "✅ Relay ready on :8198 (attempt $i)"
+              break
+            fi
+            sleep 1
+          done
 
       - name: Run relay tests
         run: |
